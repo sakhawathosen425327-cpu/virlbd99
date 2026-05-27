@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions for validation
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Schema Validation Helpers
+    function isValidVideo(data) {
+      return data.keys().hasAll(['id', 'title', 'thumbnailUrl', 'embedUrl', 'category'])
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.thumbnailUrl is string && data.thumbnailUrl.size() <= 1048576
+        && data.embedUrl is string && data.embedUrl.size() <= 2000
+        && data.category is string && data.category.size() <= 100
+        && (!data.keys().hasAny(['views']) || data.views is number)
+        && (!data.keys().hasAny(['duration']) || (data.duration is string && data.duration.size() <= 20))
+        && (!data.keys().hasAny(['rating']) || (data.rating is string && data.rating.size() <= 10))
+        && (!data.keys().hasAny(['description']) || (data.description is string && data.description.size() <= 2000))
+        && (!data.keys().hasAny(['isTrending']) || data.isTrending is bool)
+        && (!data.keys().hasAny(['isLatest']) || data.isLatest is bool)
+        && (!data.keys().hasAny(['createdAt']) || (data.createdAt is string && data.createdAt.size() <= 40));
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name', 'slug'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.slug is string && data.slug.size() <= 100
+        && (!data.keys().hasAny(['iconName']) || (data.iconName is string && data.iconName.size() <= 50));
+    }
+
+    function isValidAdConfig(data) {
+      return data.keys().hasAll(['id', 'isEnabled'])
+        && data.id is string && data.id.size() <= 128
+        && data.isEnabled is bool
+        && (!data.keys().hasAny(['cpm']) || data.cpm is number)
+        && (!data.keys().hasAny(['clicks']) || data.clicks is number)
+        && (!data.keys().hasAny(['impressions']) || data.impressions is number)
+        && (!data.keys().hasAny(['earnings']) || data.earnings is number)
+        && (!data.keys().hasAny(['customScriptUrl']) || (data.customScriptUrl is string && data.customScriptUrl.size() <= 2000))
+        && (!data.keys().hasAny(['popunderCode']) || (data.popunderCode is string && data.popunderCode.size() <= 100000))
+        && (!data.keys().hasAny(['directLinkUrl']) || (data.directLinkUrl is string && data.directLinkUrl.size() <= 2000))
+        && (!data.keys().hasAny(['banner320x50Code']) || (data.banner320x50Code is string && data.banner320x50Code.size() <= 50000))
+        && (!data.keys().hasAny(['banner300x250Code']) || (data.banner300x250Code is string && data.banner300x250Code.size() <= 50000))
+        && (!data.keys().hasAny(['banner728x90Code']) || (data.banner728x90Code is string && data.banner728x90Code.size() <= 50000))
+        && (!data.keys().hasAny(['popunderClickFrequency']) || data.popunderClickFrequency is number)
+        && (!data.keys().hasAny(['popunderDelaySeconds']) || data.popunderDelaySeconds is number)
+        && (!data.keys().hasAny(['popunderCooldownMinutes']) || data.popunderCooldownMinutes is number)
+        && (!data.keys().hasAny(['telegramUrl']) || (data.telegramUrl is string && data.telegramUrl.size() <= 2000))
+        && (!data.keys().hasAny(['facebookUrl']) || (data.facebookUrl is string && data.facebookUrl.size() <= 2000))
+        && (!data.keys().hasAny(['whatsappUrl']) || (data.whatsappUrl is string && data.whatsappUrl.size() <= 2000))
+        && (!data.keys().hasAny(['preRollEnabled']) || data.preRollEnabled is bool)
+        && (!data.keys().hasAny(['preRollCode']) || (data.preRollCode is string && data.preRollCode.size() <= 100000))
+        && (!data.keys().hasAny(['preRollClickUrl']) || (data.preRollClickUrl is string && data.preRollClickUrl.size() <= 2000))
+        && (!data.keys().hasAny(['preRollSkipDelay']) || data.preRollSkipDelay is number)
+        && (!data.keys().hasAny(['socialBarEnabled']) || data.socialBarEnabled is bool)
+        && (!data.keys().hasAny(['socialBarCode']) || (data.socialBarCode is string && data.socialBarCode.size() <= 50000))
+        && (!data.keys().hasAny(['socialBarPosition']) || (data.socialBarPosition is string && data.socialBarPosition.size() <= 10))
+        && (!data.keys().hasAny(['popunderEnabled']) || data.popunderEnabled is bool)
+        && (!data.keys().hasAny(['directLinkEnabled']) || data.directLinkEnabled is bool)
+        && (!data.keys().hasAny(['directLinkIntervalMinutes']) || data.directLinkIntervalMinutes is number)
+        && (!data.keys().hasAny(['bannerHomeTopEnabled']) || data.bannerHomeTopEnabled is bool)
+        && (!data.keys().hasAny(['bannerHomeTopCode']) || (data.bannerHomeTopCode is string && data.bannerHomeTopCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerHomeMiddleEnabled']) || data.bannerHomeMiddleEnabled is bool)
+        && (!data.keys().hasAny(['bannerHomeMiddleCode']) || (data.bannerHomeMiddleCode is string && data.bannerHomeMiddleCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerVideoTopEnabled']) || data.bannerVideoTopEnabled is bool)
+        && (!data.keys().hasAny(['bannerVideoTopCode']) || (data.bannerVideoTopCode is string && data.bannerVideoTopCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerVideoUnderPlayerEnabled']) || data.bannerVideoUnderPlayerEnabled is bool)
+        && (!data.keys().hasAny(['bannerVideoUnderPlayerCode']) || (data.bannerVideoUnderPlayerCode is string && data.bannerVideoUnderPlayerCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerSidebarEnabled']) || data.bannerSidebarEnabled is bool)
+        && (!data.keys().hasAny(['bannerSidebarCode']) || (data.bannerSidebarCode is string && data.bannerSidebarCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerMobileBottomEnabled']) || data.bannerMobileBottomEnabled is bool)
+        && (!data.keys().hasAny(['bannerMobileBottomCode']) || (data.bannerMobileBottomCode is string && data.bannerMobileBottomCode.size() <= 50000));
+    }
+
+    function isValidDailyAdStats(data) {
+      return data.keys().hasAll(['id', 'preRollShown', 'preRollSkipped', 'directLinkFired'])
+        && data.id is string && data.id.size() <= 128
+        && data.preRollShown is number
+        && data.preRollSkipped is number
+        && data.directLinkFired is number;
+    }
+
+    function isValidAdminSecurity(data) {
+      return data.keys().hasAll(['id', 'password', 'failedAttempts', 'blockedUntil'])
+        && data.id is string && data.id.size() <= 128
+        && data.password is string && data.password.size() <= 1000
+        && data.failedAttempts is number
+        && data.blockedUntil is string && data.blockedUntil.size() <= 100;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'action', 'timestamp', 'details'])
+        && data.id is string && data.id.size() <= 128
+        && data.action is string && data.action.size() <= 500
+        && data.timestamp is string && data.timestamp.size() <= 100
+        && data.details is string && data.details.size() <= 5000;
+    }
+
+    // Collection routing Rules
+
+    // Videos Collection Rules
+    match /videos/{videoId} {
+      allow read: if true;
+      allow create: if isValidId(videoId) && isValidVideo(incoming()) && incoming().id == videoId;
+      allow update: if isValidId(videoId) && (
+        // Case 1: Pure single-key increment logic for views count tracking (bypasses payload checks entirely)
+        incoming().diff(existing()).affectedKeys().hasOnly(['views'])
+        ||
+        // Case 2: Full administrative metadata mutations (validate structure and key constraints)
+        (isValidVideo(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly([
+          'id', 'title', 'thumbnailUrl', 'embedUrl', 'category', 
+          'description', 'duration', 'rating', 'isTrending', 'isLatest', 
+          'views', 'createdAt'
+        ]))
+      );
+      allow delete: if isValidId(videoId);
+    }
+
+    // Categories Collection Rules
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create: if isValidId(categoryId) && isValidCategory(incoming()) && incoming().id == categoryId;
+      allow update: if isValidId(categoryId) && isValidCategory(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'slug', 'iconName'])
+      );
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Ad Settings Rules
+    match /adSettings/{adId} {
+      allow read: if true;
+      allow create: if isValidId(adId) && isValidAdConfig(incoming()) && incoming().id == adId;
+      allow update: if isValidId(adId) && isValidAdConfig(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'isEnabled', 'clicks', 'impressions', 'earnings', 'cpm', 'customScriptUrl',
+          'popunderCode', 'directLinkUrl', 'banner320x50Code', 'banner300x250Code', 'banner728x90Code',
+          'popunderClickFrequency', 'popunderDelaySeconds', 'popunderCooldownMinutes',
+          'telegramUrl', 'facebookUrl', 'whatsappUrl',
+          'preRollEnabled', 'preRollCode', 'preRollClickUrl', 'preRollSkipDelay',
+          'socialBarEnabled', 'socialBarCode', 'socialBarPosition',
+          'popunderEnabled', 'directLinkEnabled', 'directLinkIntervalMinutes',
+          'bannerHomeTopEnabled', 'bannerHomeTopCode', 'bannerHomeMiddleEnabled', 'bannerHomeMiddleCode',
+          'bannerVideoTopEnabled', 'bannerVideoTopCode', 'bannerVideoUnderPlayerEnabled', 'bannerVideoUnderPlayerCode',
+          'bannerSidebarEnabled', 'bannerSidebarCode', 'bannerMobileBottomEnabled', 'bannerMobileBottomCode'
+        ])
+      );
+      allow delete: if isValidId(adId);
+    }
+
+    // Admin Security Settings Rules
+    match /adminSecurity/{docId} {
+      allow read: if true;
+      allow create: if isValidId(docId) && isValidAdminSecurity(incoming()) && incoming().id == docId;
+      allow update: if isValidId(docId) && isValidAdminSecurity(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['password', 'failedAttempts', 'blockedUntil'])
+      );
+      allow delete: if false;
+    }
+
+    // Activity Audit Logs Rules
+    match /activityLogs/{logId} {
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidActivityLog(incoming()) && incoming().id == logId;
+      allow update, delete: if false;
+    }
+
+    // Daily Ad Statistics Rules
+    match /adDailyStats/{dateId} {
+      allow read: if true;
+      allow create, update: if isValidId(dateId) && isValidDailyAdStats(incoming()) && incoming().id == dateId;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ViralBD99",
+  "description": "ViralBD99 is a minimalist, mobile-first dark and yellow themed video player platform supporting Google Drive link embeds, customizable category navigation, and quick access presets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

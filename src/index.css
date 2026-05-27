@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Custom High Contrast Yellow & Black Accents (ViralBD99 Theme) */
+  --color-brand-yellow: #f5c518;
+  --color-brand-yellow-hover: #dcb010;
+  --color-brand-red: #f5c518;
+  --color-brand-red-hover: #dcb010;
+  --color-brand-purple: #f5c518;
+  --color-brand-purple-hover: #dcb010;
+  --color-dark-bg: #0a0a0a;
+  --color-dark-card: #151515;
+  --color-dark-glass: rgba(10, 10, 10, 0.85);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-dark-bg);
+    color: #F5F5F5;
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+
+  /* Custom premium scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2D2D2D;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #444444;
+  }
+}
+
+/* Glassmorphism custom classes */
+@keyframes progress-slide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(-30%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-progress-slide {
+  animation: progress-slide 1.5s infinite ease-in-out;
+}
+
+.glass-panel {
+  background: rgba(23, 23, 23, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-nav {
+  background: rgba(15, 15, 15, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-header {
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom scroll row with hidden scrollbars for swipe navigation on cards */
+.scroll-row {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}

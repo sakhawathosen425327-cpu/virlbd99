@@ -1,0 +1,257 @@
+{
+  "entities": {
+    "Video": {
+      "title": "Video Entity",
+      "description": "A video metadata entry with standard field types for streaming and curation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique string document ID for the video."
+        },
+        "title": {
+          "type": "string",
+          "description": "Visible display name/title of the stream."
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "An image URL for cards, grids, and hero sections."
+        },
+        "embedUrl": {
+          "type": "string",
+          "description": "A fully qualified Google Drive iframe or valid stream embed URL."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category or genre tag mapping."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short synopsis or descriptive summary."
+        },
+        "views": {
+          "type": "number",
+          "description": "An incremental counter tracking consumer stream view iterations."
+        },
+        "duration": {
+          "type": "string",
+          "description": "Label indicating stream length, e.g. 2h 15m or 45s."
+        },
+        "rating": {
+          "type": "string",
+          "description": "Content rating signifier, e.g., PG-13, 18+."
+        },
+        "isTrending": {
+          "type": "boolean",
+          "description": "Curation flag for banner displays."
+        },
+        "isLatest": {
+          "type": "boolean",
+          "description": "Curation flag marking novel releases."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp or Firebase server-time representation."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "thumbnailUrl",
+        "embedUrl",
+        "category"
+      ]
+    },
+    "Category": {
+      "title": "Category Entity",
+      "description": "Groupings and genres to categorize videos in horizontal scrolls.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "iconName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug"
+      ]
+    },
+    "AdNetworkConfig": {
+      "title": "Ad Settings Entity",
+      "description": "Settings for simulated or real web ads embedding configurations.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "isEnabled": {
+          "type": "boolean"
+        },
+        "cpm": {
+          "type": "number"
+        },
+        "clicks": {
+          "type": "number"
+        },
+        "impressions": {
+          "type": "number"
+        },
+        "earnings": {
+          "type": "number"
+        },
+        "customScriptUrl": {
+          "type": "string"
+        },
+        "popunderCode": {
+          "type": "string"
+        },
+        "directLinkUrl": {
+          "type": "string"
+        },
+        "banner320x50Code": {
+          "type": "string"
+        },
+        "banner300x250Code": {
+          "type": "string"
+        },
+        "banner728x90Code": {
+          "type": "string"
+        },
+        "popunderClickFrequency": {
+          "type": "number"
+        },
+        "popunderDelaySeconds": {
+          "type": "number"
+        },
+        "popunderCooldownMinutes": {
+          "type": "number"
+        },
+        "telegramUrl": {
+          "type": "string"
+        },
+        "facebookUrl": {
+          "type": "string"
+        },
+        "whatsappUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "isEnabled"
+      ]
+    },
+    "AdminSecurity": {
+      "title": "Admin Security Configuration",
+      "description": "Holds admin security locks, passwords, and brute force blocker variables.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "failedAttempts": {
+          "type": "number"
+        },
+        "blockedUntil": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "password",
+        "failedAttempts",
+        "blockedUntil"
+      ]
+    },
+    "ActivityLog": {
+      "title": "Activity Log Entry",
+      "description": "Historical log entry registering an administrative dashboard action.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "action",
+        "timestamp",
+        "details"
+      ]
+    },
+    "DailyAdStats": {
+      "title": "Daily Ad Statistics",
+      "description": "Daily counts tracking pre-roll ads rendered, skipped, and pop-under direct link hits.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The date string representing this daily record, YYYY-MM-DD"
+        },
+        "preRollShown": {
+          "type": "number"
+        },
+        "preRollSkipped": {
+          "type": "number"
+        },
+        "directLinkFired": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "preRollShown",
+        "preRollSkipped",
+        "directLinkFired"
+      ]
+    }
+  },
+  "firestore": {
+    "/videos/{videoId}": {
+      "schema": "Video",
+      "description": "Document storage holding active streams accessible page-side."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Pre-configured stream genres and categories."
+    },
+    "/adSettings/{adId}": {
+      "schema": "AdNetworkConfig",
+      "description": "Ad network parameters and simulated click analytics."
+    },
+    "/adminSecurity/{docId}": {
+      "schema": "AdminSecurity",
+      "description": "Holds the password and the brute force count and expiry."
+    },
+    "/activityLogs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Logs of admin operations."
+    },
+    "/adDailyStats/{dateId}": {
+      "schema": "DailyAdStats",
+      "description": "Holds the counts for ad impressions from various formats grouped by calendar day."
+    }
+  }
+}
