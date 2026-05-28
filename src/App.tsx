@@ -26,11 +26,13 @@ import {
 
 import Header from "./components/Header";
 import VideoGrid from "./components/VideoGrid";
-import VideoPlayerModal from "./components/VideoPlayerModal";
-import AdminPanel from "./components/AdminPanel";
 import AdPlacement from "./components/AdPlacement";
 import HeroSlider from "./components/HeroSlider";
 import BottomNav from "./components/BottomNav";
+import SmartCategoryFilter from "./components/SmartCategoryFilter";
+
+const AdminPanel = React.lazy(() => import("./components/AdminPanel"));
+const VideoPlayerModal = React.lazy(() => import("./components/VideoPlayerModal"));
 
 const PRELOADER_MESSAGES = [
   "🔞 সার্ভার গরম হচ্ছে! একটু ধৈর্য ধরুন...",
@@ -222,6 +224,25 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [visibleCount, setVisibleCount] = useState(8);
 
+  // Real-time site live viewer counter
+  const [appLiveViewers, setAppLiveViewers] = useState(() => {
+    return Math.floor(Math.random() * (1150 - 650 + 1)) + 650;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAppLiveViewers((current) => {
+        const isAddition = Math.random() > 0.5;
+        const amount = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
+        let nextValue = isAddition ? current + amount : current - amount;
+        if (nextValue < 650) nextValue = 650 + (650 - nextValue);
+        if (nextValue > 1150) nextValue = 1150 - (nextValue - 1150);
+        return nextValue;
+      });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Infinite scroll trigger
   useEffect(() => {
     const handleScroll = () => {
@@ -240,6 +261,31 @@ export default function App() {
   // SECURE ADMIN SYSTEM AUTH STATES
   // ==========================================
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const user = {
+    role: isLoggedIn ? "admin" : "public"
+  };
+
+  const showAdminPanel = () => {
+    setIsAdminMode(true);
+  };
+
+  const hideAdminPanel = () => {
+    setIsAdminMode(false);
+    if (currentTab === ViewTab.ADMIN) {
+      setCurrentTab(ViewTab.HOME);
+    }
+  };
+
+  // Visibility logic and observer check
+  useEffect(() => {
+    if (user.role === "admin") {
+      showAdminPanel();
+    } else {
+      hideAdminPanel();
+    }
+  }, [isLoggedIn]);
+
   const [loginStep, setLoginStep] = useState(1); // 1 = Secret knock, 2 = Password
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [lockoutSecs, setLockoutSecs] = useState<number>(0);
@@ -360,6 +406,46 @@ export default function App() {
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutSecs]);
+
+  // Automated background trigger for scheduled videos
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const now = new Date();
+      
+      setVideos((prevVideos) => {
+        const dueVideos = prevVideos.filter(v => v.status === "scheduled" && v.scheduledAt && new Date(v.scheduledAt) <= now);
+        
+        if (dueVideos.length === 0) {
+          return prevVideos;
+        }
+
+        console.log(`Auto-publishing ${dueVideos.length} scheduled videos...`);
+        
+        dueVideos.forEach(async (video) => {
+          try {
+            await updateVideo(video.id, { status: "published" });
+            await addActivityLog("Scheduled Video Published", `Video titled "${video.title}" was automatically published.`);
+          } catch (err) {
+            console.error(`Failed to automatically publish scheduled video ${video.id}:`, err);
+          }
+        });
+
+        setTimeout(() => {
+          loadLogs();
+        }, 100);
+
+        return prevVideos.map(v => {
+          const isDue = dueVideos.some(dv => dv.id === v.id);
+          if (isDue) {
+            return { ...v, status: "published" as const };
+          }
+          return v;
+        });
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Load activity logs
   const loadLogs = async () => {
@@ -899,6 +985,9 @@ export default function App() {
   // Filter systems based on active filters and search queries
   const getFilteredVideos = () => {
     let result = [...videos];
+    if (currentTab !== ViewTab.ADMIN) {
+      result = result.filter(v => v.status !== "scheduled");
+    }
 
     // Implement dynamic sorting: 'videos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))'
     result.sort((a, b) => (new Date(b.createdAt || '') as any) - (new Date(a.createdAt || '') as any));
@@ -919,6 +1008,10 @@ export default function App() {
       if (selectedCategory === "latest") {
         // "Latest" section dynamically fetches and maps the most recent 10 videos
         return result.slice(0, 10);
+      }
+      if (selectedCategory === "trending") {
+        // "Trending" section dynamically fetches category trending or isTrending flag
+        return result.filter((v) => v.category === "trending" || v.isTrending === true);
       }
       result = result.filter((v) => v.category === selectedCategory);
     }
@@ -1026,7 +1119,10 @@ export default function App() {
 
       {/* Admin Mode top panel banner (Retained elegantly for testing and review uploads) */}
       {isAdminMode && (
-        <div className="bg-[#f5c518]/10 border-b border-[#f5c518]/30 text-[#f5c518] py-2 px-4 text-center text-xs font-mono flex items-center justify-center gap-2 select-none relative z-50">
+        <div 
+          style={{ display: user.role === "admin" ? "flex" : "none" }}
+          className="bg-[#f5c518]/10 border-b border-[#f5c518]/30 text-[#f5c518] py-2 px-4 text-center text-xs font-mono flex items-center justify-center gap-2 select-none relative z-50"
+        >
           <span>ADMINISTRATOR MODE ACTIVE — DIRECT VIDEO MANAGER ACCESSIBLE</span>
           <button 
             type="button"
@@ -1074,6 +1170,14 @@ export default function App() {
         }}
       />
 
+      {/* Sleek Live Viewer Broadcast Badge (Just Below Header) */}
+      <div className="w-full max-w-7xl mx-auto px-4 mt-3 flex justify-end shrink-0" id="site-live-viewers-container">
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-black/60 backdrop-blur-md border border-[#10b981]/15 rounded-full text-emerald-400 text-[10px] sm:text-[11px] font-black select-none shadow-[0_2px_12px_rgba(16,185,129,0.05)] animate-fade-in">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>🟢 {toBanglaNumber(appLiveViewers)} জন দেখছেন</span>
+        </div>
+      </div>
+
       {/* Switchable Viewport Ad Placement banner (Desktop 728x90 vs Mobile 320x50) */}
       {adSettings.isEnabled && adSettings.bannerHomeTopEnabled && (
         <div className="w-full max-w-7xl mx-auto px-4 md:px-0 mt-2 mb-4" id="banner-space-top">
@@ -1115,7 +1219,7 @@ export default function App() {
               )}
             </div>
 
-            {videos.filter((v) => bookmarkedIds.includes(v.id)).length === 0 ? (
+            {videos.filter((v) => v.status !== "scheduled" && bookmarkedIds.includes(v.id)).length === 0 ? (
               <div className="text-center py-20 bg-zinc-900/10 border border-dashed border-white/5 rounded-2xl" id="empty-bookmarks-slate">
                 <Bookmark className="w-10 h-10 text-slate-505 mx-auto mb-3" />
                 <p className="text-xs font-bold text-slate-350">আপনি এখনো কোনো ভিডিও সেভ করেননি।</p>
@@ -1123,7 +1227,7 @@ export default function App() {
               </div>
             ) : (
               <VideoGrid
-                videos={videos.filter((v) => bookmarkedIds.includes(v.id))}
+                videos={videos.filter((v) => v.status !== "scheduled" && bookmarkedIds.includes(v.id))}
                 onPlayVideo={handlePlayVideo}
                 bookmarkedIds={bookmarkedIds}
                 onToggleBookmark={handleToggleBookmark}
@@ -1139,6 +1243,7 @@ export default function App() {
               <HeroSlider
                 trendingVideos={(() => {
                   const trendList = [...(selectedCategory === "all" ? videos : videos.filter(v => v.category === selectedCategory))]
+                    .filter(v => v.status !== "scheduled")
                     .sort((a, b) => (b.views || 0) - (a.views || 0));
                   return trendList.slice(0, 5);
                 })()}
@@ -1150,9 +1255,11 @@ export default function App() {
 
             {/* Middle homepage banner spacing */}
             {adSettings.isEnabled && adSettings.bannerHomeMiddleEnabled && (adSettings.bannerHomeMiddleCode || adSettings.banner300x250Code) && (
-              <div className="w-full flex flex-col justify-center items-center bg-[#1a1a1a] p-3 rounded-xl border border-[#222222] max-w-sm mx-auto" id="banner-homepage-middle">
-                <span className="text-[8px] font-mono text-[#f5c518] font-bold mb-1 tracking-widest uppercase">SPONSORED LINKS</span>
-                <AdPlacement code={adSettings.bannerHomeMiddleCode || adSettings.banner300x250Code || ""} type="300x250" />
+              <div className="w-full flex flex-col justify-center items-center bg-[#121214] p-3.5 rounded-2xl border border-white/5 max-w-sm mx-auto shadow-xl select-none" id="banner-homepage-middle">
+                <span className="text-[8px] font-mono text-[#f5c518] font-black mb-2 tracking-widest uppercase text-center shrink-0">SPONSORED LINKS / বিজ্ঞাপন</span>
+                <div className="w-[300px] h-[250px] overflow-hidden flex items-center justify-center shrink-0">
+                  <AdPlacement code={adSettings.bannerHomeMiddleCode || adSettings.banner300x250Code || ""} type="300x250" />
+                </div>
               </div>
             )}
 
@@ -1171,11 +1278,13 @@ export default function App() {
                   id="trending-posters-row"
                 >
                   {(() => {
-                    const latestList = [...videos].sort((a, b) => {
-                      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                      return dateB - dateA;
-                    });
+                    const latestList = [...videos]
+                      .filter(v => v.status !== "scheduled")
+                      .sort((a, b) => {
+                        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                        return dateB - dateA;
+                      });
                     const activeTrend = latestList.slice(0, 10);
                     return activeTrend.map((vid) => {
                       const simulatedViewers = 110 + ((vid.views || 0) % 240);
@@ -1226,6 +1335,19 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* SMART CATEGORY FILTER (REPOSITIONED DIRECTLY BELOW TRENDING AND ABOVE LATEST VIDEOS WITH AMPLE SPACING) */}
+            <div className="pt-2 pb-1" id="repositioned-smart-filter-container">
+              <SmartCategoryFilter
+                selectedCategory={selectedCategory}
+                onSelectCategory={(slug) => {
+                  setSelectedCategory(slug);
+                  if (currentTab !== ViewTab.HOME) {
+                    setCurrentTab(ViewTab.HOME);
+                  }
+                }}
+              />
+            </div>
 
             {/* 5. LATEST VIDEOS GRID */}
             <div className="w-full" id="home-latest-clips-grid">
@@ -1372,21 +1494,25 @@ export default function App() {
               )
             ) : (
               /* Legitimate authorized workspace views */
-              <AdminPanel
-                videos={videos}
-                categories={categories}
-                adSettings={adSettings}
-                onAddVideo={handleAddVideo}
-                onUpdateVideo={handleUpdateVideo}
-                onDeleteVideo={handleDeleteVideo}
-                onResetSeedData={handleResetSeedData}
-                onUpdateAdSettings={handleUpdateAdSettings}
-                onTriggerSimulatedClick={handleTriggerSimulatedAdClick}
-                onResetSimulatedEarnings={handleResetSimulatedEarnings}
-                onLogout={handleLogout}
-                activityLogs={activityLogsList}
-                onSaveCategory={handleSaveCategory}
-              />
+              <div style={{ display: user.role === "admin" ? "block" : "none" }}>
+                <React.Suspense fallback={<div className="text-zinc-500 font-mono text-xs w-full text-center py-12">Loading Admin Panel controls...</div>}>
+                  <AdminPanel
+                    videos={videos}
+                    categories={categories}
+                    adSettings={adSettings}
+                    onAddVideo={handleAddVideo}
+                    onUpdateVideo={handleUpdateVideo}
+                    onDeleteVideo={handleDeleteVideo}
+                    onResetSeedData={handleResetSeedData}
+                    onUpdateAdSettings={handleUpdateAdSettings}
+                    onTriggerSimulatedClick={handleTriggerSimulatedAdClick}
+                    onResetSimulatedEarnings={handleResetSimulatedEarnings}
+                    onLogout={handleLogout}
+                    activityLogs={activityLogsList}
+                    onSaveCategory={handleSaveCategory}
+                  />
+                </React.Suspense>
+              </div>
             )}
           </div>
         )}
@@ -1394,210 +1520,224 @@ export default function App() {
 
       {/* Cinema Live Overlay Modal */}
       {activePlayingVideo && (
-        <VideoPlayerModal
-          video={activePlayingVideo}
-          allVideos={videos}
-          onClose={() => setActivePlayingVideo(null)}
-          onPlayVideo={handlePlayVideo}
-          adSettings={adSettings}
-          bookmarkedIds={bookmarkedIds}
-          onToggleBookmark={handleToggleBookmark}
-          isAdmin={isLoggedIn}
-        />
+        <React.Suspense fallback={<div className="fixed inset-0 z-[999999] bg-[#070708]/90 flex items-center justify-center text-white font-mono text-sm">Loading Premium Video Stream...</div>}>
+          <VideoPlayerModal
+            video={activePlayingVideo}
+            allVideos={videos}
+            onClose={() => setActivePlayingVideo(null)}
+            onPlayVideo={handlePlayVideo}
+            adSettings={adSettings}
+            bookmarkedIds={bookmarkedIds}
+            onToggleBookmark={handleToggleBookmark}
+            isAdmin={isLoggedIn}
+          />
+        </React.Suspense>
       )}
 
-      {/* Dynamic Informative Footer */}
-      <footer className="w-full bg-[#0a0a0c] border-t border-white/5 mt-12 py-12 px-6 sm:px-8" id="app-footer">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-          
-          {/* Column 1: Platform Meta & 18+ */}
-          <div className="flex flex-col gap-4">
+      {/* Dynamic Centered Dark Footer */}
+      <footer className="w-full bg-[#08080a] border-t border-white/5 mt-10 md:mt-16 py-10 px-4 sm:px-8 select-none" id="app-footer">
+        <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-7">
+
+          {/* More Categories Grid */}
+          <div className="w-full text-left" id="more-categories-section">
+            <div className="border-l-4 border-amber-500 pl-2.5 mb-3.5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs sm:text-sm font-black uppercase text-white font-sans tracking-wide">
+                  🏷️ অন্যান্য ক্যাটাগরি (More Categories)
+                </h3>
+                <p className="text-[9px] text-[#aaaaaa] font-mono mt-0.5">পছন্দের বিভাগ এক্সপ্লোর করুন</p>
+              </div>
+              <span className="text-[9px] bg-white/5 text-[#aaaaaa] font-mono px-2 py-0.5 rounded-full select-none border border-white/5">EXPLORE-MODE</span>
+            </div>
             
-            {/* Curated Social Community Channels - Beautifully integrated to fit the premium theme */}
-            <div className="flex flex-wrap gap-2 pt-1 pb-1" id="social-community-channels">
-              <a
-                href={adSettings.telegramUrl || "https://t.me/viralbd99"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/15 text-[11px] font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
-                title="Join Telegram Channel"
-              >
-                <Send className="w-3.5 h-3.5 text-sky-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                <span>Telegram</span>
-              </a>
-              <a
-                href={adSettings.facebookUrl || "https://facebook.com/viralbd99"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/15 text-[11px] font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
-                title="Follow Facebook Page"
-              >
-                <Facebook className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
-                <span>Facebook</span>
-              </a>
-              <a
-                href={adSettings.whatsappUrl || "https://whatsapp.com/channel/viralbd99"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/15 text-[11px] font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
-                title="Join WhatsApp Channel"
-              >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span>WhatsApp</span>
-              </a>
-            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {categories.map((cat) => {
+                const IconComponent = () => {
+                  switch (cat.iconName?.toLowerCase()) {
+                    case "flame": return <Flame className="w-4 h-4 text-[#f5c518]" />;
+                    case "clock": return <Clock className="w-4 h-4 text-[#f5c518]" />;
+                    case "sparkles": return <Sparkles className="w-4 h-4 text-[#f5c518]" />;
+                    case "award": return <Award className="w-4 h-4 text-[#f5c518]" />;
+                    case "heart": return <Heart className="w-4 h-4 text-[#f5c518]" />;
+                    case "tv": return <Tv className="w-4 h-4 text-[#f5c518]" />;
+                    case "globe": return <Globe className="w-4 h-4 text-[#f5c518]" />;
+                    default: return <Film className="w-4 h-4 text-[#f5c518]" />;
+                  }
+                };
+                
+                const isSelected = selectedCategory === cat.slug;
+                const videoCount = videos.filter(v => v.category === cat.slug && v.status !== "scheduled").length;
 
-            <div className="flex items-center gap-1.5 hover:opacity-95 transition-opacity">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#f33e3e]"></span>
-              <span className="text-base font-extrabold font-display text-white tracking-wider uppercase">ViralBD99</span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed font-sans">
-              The ultimate destination for premium video content. Stream the latest, trending, and exclusive videos in HD quality.
-            </p>
-            {/* Ad above 18+ Warning */}
-            {adSettings.isEnabled && adSettings.banner320x50Code && (
-              <div className="w-full max-w-xs flex flex-col justify-center items-center bg-black/40 rounded-xl p-1.5 border border-white/5" id="ad-above-warning">
-                <span className="text-[8px] font-mono text-amber-500/80 font-bold mb-1 tracking-widest">SPONSORED LINK</span>
-                <AdPlacement code={adSettings.banner320x50Code} type="320x50" />
-              </div>
-            )}
-
-            {/* 18+ Adults Only Warning */}
-            <div className="flex items-center gap-2.5 mt-2 bg-red-500/5 border border-red-500/20 p-2.5 rounded-xl max-w-xs w-full">
-              <span className="inline-flex items-center justify-center text-[10px] font-black text-red-500 bg-red-500/15 border border-red-500/30 w-8 h-8 rounded-full shrink-0">
-                18+
-              </span>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-300">Adults only.</span>
-                <span className="text-[9px] text-slate-500 font-sans">Must be 18 or older.</span>
-              </div>
-            </div>
-
-            {/* Ad below 18+ Warning */}
-            {adSettings.isEnabled && adSettings.banner300x250Code && (
-              <div className="w-full max-w-xs flex flex-col justify-center items-center bg-black/40 rounded-xl p-1.5 border border-white/5" id="ad-below-warning">
-                <span className="text-[8px] font-mono text-[#f5c518]/90 font-bold mb-1 tracking-widest">RECOMMENDED FOR YOU</span>
-                <AdPlacement code={adSettings.banner300x250Code} type="300x250" />
-              </div>
-            )}
-          </div>
-
-          {/* Column 2: Categories */}
-          <div className="flex flex-col">
-            <span className="block text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-4 font-extrabold">Categories</span>
-            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              {[
-                { name: "Latest", slug: "latest" },
-                { name: "Trending", slug: "trending" },
-                { name: "Viral", slug: "viral" },
-                { name: "Premium", slug: "premium" },
-                { name: "Asian", slug: "asian" },
-                { name: "Short Clips", slug: "short-clips" },
-                { name: "Exclusive", slug: "exclusive" },
-                { name: "HD Videos", slug: "hd-videos" }
-              ].map((cat) => (
-                <li key={cat.slug}>
-                  <button 
+                return (
+                  <button
+                    key={cat.id || cat.slug}
                     onClick={() => {
                       setSelectedCategory(cat.slug);
                       setCurrentTab(ViewTab.HOME);
                       window.scrollTo({ top: 380, behavior: "smooth" });
                     }}
-                    className="text-slate-400 hover:text-[#f5c518] transition-colors cursor-pointer text-left block py-0.5 font-sans"
+                    className={`flex items-center gap-2.5 p-3 rounded-xl transition-all duration-300 border text-left select-none cursor-pointer ${
+                      isSelected 
+                        ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/40 text-white shadow-[0_0_12px_rgba(245,197,24,0.15)]"
+                        : "bg-[#141416]/90 hover:bg-[#1c1c1f] border-white/5 text-slate-300 hover:text-white hover:border-amber-500/20"
+                    }`}
                   >
-                    {cat.name}
+                    <div className={`p-1.5 rounded-lg shrink-0 ${isSelected ? "bg-amber-500/20" : "bg-white/5"}`}>
+                      <IconComponent />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[11px] font-black leading-tight block truncate">
+                        {cat.name}
+                      </span>
+                      <span className="text-[8px] text-slate-500 font-mono block mt-0.5">
+                        {toBanglaNumber(videoCount)} ভিডিও
+                      </span>
+                    </div>
                   </button>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Column 3: Information */}
-          <div className="flex flex-col">
-            <span className="block text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-4 font-extrabold">Information</span>
-            <ul className="space-y-3 text-xs">
-              <li>
-                <button 
-                  onClick={() => setFooterModal("privacy")}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer text-left font-sans"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>Privacy Policy</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => setFooterModal("terms")}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer text-left font-sans"
-                >
-                  <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>Terms of Service</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => setFooterModal("dmca")}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors cursor-pointer font-semibold shrink-0 font-sans"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-500/80 shrink-0" />
-                  <span>DMCA</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => setFooterModal("content_removal")}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors cursor-pointer text-left font-sans"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-500/80 shrink-0" />
-                  <span>Content Removal</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => setFooterModal("contact")}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer text-left font-sans"
-                >
-                  <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>Contact Us</span>
-                </button>
-              </li>
-            </ul>
-          </div>
-
-        </div>
-
-        {/* Separator & Clean Footnote matches: © 2026 ViralBD99 - All rights curated. Made with ❤️ in Bangladesh */}
-        <div className="max-w-7xl mx-auto border-t border-white/5 mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500 select-none">
-          <div className="flex flex-wrap items-center gap-1 text-slate-400 text-center sm:text-left justify-center sm:justify-start">
-            <span>© 2026</span>
-            <span
-              onClick={() => {
-                window.history.pushState(null, "", "/admin-shamim27");
-                setIsAdminMode(true);
-                setCurrentTab(ViewTab.ADMIN);
-              }}
-              className="hover:text-[#f5c518] cursor-pointer font-bold duration-150 select-none mx-0.5"
-              title="Secure System Hub"
+          {/* Spacer & Divider */}
+          <div className="w-full h-px bg-white/5 my-1 md:my-2 shrink-0 animate-fade-in" />
+          
+          {/* Curated Social Community Channels */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pb-1" id="social-community-channels">
+            <a
+              href={adSettings.telegramUrl || "https://t.me/viralbd99"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/15 text-[10px] sm:text-xs font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
+              title="Join Telegram Channel"
             >
-              ViralBD99
-            </span>
-            <span>- All rights curated. Made with</span>
-            <span className="mx-0.5 text-red-500">❤️</span>
-            <span>in Bangladesh</span>
+              <Send className="w-3.5 h-3.5 text-sky-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <span>Telegram</span>
+            </a>
+            <a
+              href={adSettings.facebookUrl || "https://facebook.com/viralbd99"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/15 text-[10px] sm:text-xs font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
+              title="Follow Facebook Page"
+            >
+              <Facebook className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span>Facebook</span>
+            </a>
+            <a
+              href={adSettings.whatsappUrl || "https://whatsapp.com/channel/viralbd99"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/15 text-[10px] sm:text-xs font-bold font-mono tracking-wide transition-all shadow-md active:scale-95 group cursor-pointer"
+              title="Join WhatsApp Channel"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span>WhatsApp</span>
+            </a>
           </div>
 
-          {isAdminMode && (
-            <div className="flex items-center gap-4">
+          {/* Platform Title Descriptor */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+              <span className="text-base font-black font-display text-white tracking-widest uppercase">ViralBD99</span>
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+            </div>
+            <p className="text-xs text-slate-400 max-w-sm sm:max-w-md leading-relaxed font-sans">
+              The ultimate destination for premium video content. Stream the latest, trending, and exclusive videos in HD quality.
+            </p>
+          </div>
+
+          {/* Ad Placement Inside Centered Container to Keep Responsive and Aligned */}
+          {adSettings.isEnabled && adSettings.banner320x50Code && (
+            <div className="w-full max-w-xs flex flex-col justify-center items-center bg-black/40 rounded-xl p-1.5 border border-white/5 mx-auto" id="ad-above-warning">
+              <span className="text-[7px] font-mono text-amber-500/80 font-bold mb-1 tracking-widest leading-none">SPONSORED LINK</span>
+              <div className="w-[320px] h-[50px] overflow-hidden flex items-center justify-center shrink-0">
+                <AdPlacement code={adSettings.banner320x50Code} type="320x50" />
+              </div>
+            </div>
+          )}
+
+          {/* Centered Quick Information Links */}
+          <div className="w-full border-t border-white/5 pt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[11px] sm:text-xs">
+            <button 
+              onClick={() => setFooterModal("privacy")}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-[#f5c518] transition-colors cursor-pointer font-sans"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Privacy Policy</span>
+            </button>
+            <button 
+              onClick={() => setFooterModal("terms")}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-[#f5c518] transition-colors cursor-pointer font-sans"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Terms of Service</span>
+            </button>
+            <button 
+              onClick={() => setFooterModal("dmca")}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors cursor-pointer font-semibold font-sans"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500/80 shrink-0" />
+              <span>DMCA</span>
+            </button>
+            <button 
+              onClick={() => setFooterModal("content_removal")}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors cursor-pointer font-sans text-left"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500/80 shrink-0" />
+              <span>Content Removal</span>
+            </button>
+            <button 
+              onClick={() => setFooterModal("contact")}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-[#f5c518] transition-colors cursor-pointer font-sans"
+            >
+              <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Contact Us</span>
+            </button>
+          </div>
+
+          {/* Mature Content Warning Emblem */}
+          <div className="flex items-center gap-2.5 bg-red-500/5 border border-red-500/20 px-4 py-2 rounded-full max-w-xs mx-auto text-left sm:text-center mt-1">
+            <span className="inline-flex items-center justify-center text-[10px] font-black text-red-500 bg-red-500/15 border border-red-500/30 w-7 h-7 rounded-full shrink-0">
+              18+
+            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] font-bold text-slate-300">Adults only.</span>
+              <span className="text-[8.5px] text-slate-500 font-sans">Must be 18 or older to browse.</span>
+            </div>
+          </div>
+
+          {/* Centered copyright segment & exclusive secret desk option */}
+          <div className="w-full border-t border-white/5 pt-6 flex flex-col items-center gap-4 text-xs font-mono text-slate-500 select-none">
+            <p className="text-slate-400 text-center leading-relaxed">
+              © 2026{" "}
+              <span
+                onClick={() => {
+                  window.history.pushState(null, "", "/admin-shamim27");
+                  setIsAdminMode(true);
+                  setCurrentTab(ViewTab.ADMIN);
+                }}
+                className="hover:text-[#f5c518] cursor-pointer font-bold duration-150 select-none pb-0.5 border-b border-transparent hover:border-[#f5c518]/40"
+                title="Secure System Hub"
+              >
+                ViralBD99
+              </span>{" "}
+              - All rights curated. Made with <span className="text-red-500">❤️</span> in Bangladesh
+            </p>
+
+            {isAdminMode && (
               <button 
                 onClick={() => {
                   setCurrentTab(currentTab === ViewTab.ADMIN ? ViewTab.HOME : ViewTab.ADMIN);
                 }}
-                className="text-[#f5c518] hover:underline cursor-pointer bg-[#151515] px-2.5 py-0.5 border border-white/10 rounded font-bold transition hover:bg-[#202020] text-xs"
+                className="text-[#f5c518] hover:underline cursor-pointer bg-[#151515] px-3.5 py-1 border border-white/10 rounded-xl font-bold transition hover:bg-[#202020] text-[11px]"
               >
-                {currentTab === ViewTab.ADMIN ? "Show Main Site" : "Open Control Desk"}
+                {currentTab === ViewTab.ADMIN ? "Show Website" : "Open Control Desk"}
               </button>
-            </div>
-          )}
+            )}
+          </div>
+
         </div>
       </footer>
 
@@ -1850,12 +1990,23 @@ export default function App() {
               <User className="w-8 h-8" />
             </div>
 
-            <h3 className="text-base font-black text-white font-sans">
-              VIP IMDb Portal Member
-            </h3>
-            <p className="text-[10px] text-[#f5c518] mt-1 font-mono tracking-widest font-black uppercase">
-              VIRALBD99 PREMIUM VISITOR
-            </p>
+            <div style={{ display: user.role === "admin" ? "block" : "none" }}>
+              <h3 className="text-base font-black text-white font-sans">
+                VIP IMDb Portal Member
+              </h3>
+              <p className="text-[10px] text-[#f5c518] mt-1 font-mono tracking-widest font-black uppercase">
+                VIRALBD99 PREMIUM VISITOR
+              </p>
+            </div>
+
+            <div style={{ display: user.role !== "admin" ? "block" : "none" }}>
+              <h3 className="text-base font-black text-white font-sans">
+                IMDb Portal Guest
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-1 font-mono tracking-widest font-black uppercase">
+                VIRALBD99 STANDARD VISITOR
+              </p>
+            </div>
 
             <div className="my-5 space-y-3.5 text-left border-t border-b border-[#222222] py-4 font-sans text-xs">
               <div className="flex justify-between items-center">
@@ -1887,19 +2038,6 @@ export default function App() {
                 className="w-full bg-[#f5c518] hover:bg-[#ffe042] text-black font-black text-xs py-2.5 rounded-lg select-none cursor-pointer transition active:scale-95"
               >
                 আমার বুকমার্কস তালিকা
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowProfileModal(false);
-                  // Open admin portal direct link
-                  window.history.pushState(null, "", "/admin-shamim27");
-                  setIsAdminMode(true);
-                  setCurrentTab(ViewTab.ADMIN);
-                }}
-                className="w-full bg-[#111111] hover:bg-[#202020] text-[#aaaaaa] hover:text-white border border-[#222222] font-semibold text-[11px] py-2 rounded-lg select-none cursor-pointer transition"
-              >
-                এডমিন প্যানেল প্রবেশ (Admin Direct)
               </button>
             </div>
           </div>

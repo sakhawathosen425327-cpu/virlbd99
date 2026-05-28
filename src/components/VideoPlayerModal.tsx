@@ -127,6 +127,29 @@ export default function VideoPlayerModal({
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [commentLikeStatuses, setCommentLikeStatuses] = useState<Record<string, boolean>>({});
 
+  // Real-time live viewer counter logic
+  const [liveViewers, setLiveViewers] = useState(() => {
+    return Math.floor(Math.random() * (1150 - 650 + 1)) + 650;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveViewers((current) => {
+        const isAddition = Math.random() > 0.5;
+        const amount = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
+        let nextValue = isAddition ? current + amount : current - amount;
+        if (nextValue < 650) nextValue = 650 + (650 - nextValue);
+        if (nextValue > 1150) nextValue = 1150 - (nextValue - 1150);
+        return nextValue;
+      });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    setLiveViewers(Math.floor(Math.random() * (1150 - 650 + 1)) + 650);
+  }, [video.id]);
+
   // Related videos algorithm prioritizing Same Category first, Same Tags second, Most Viewed third
   const getRelatedVideos = () => {
     return [...allVideos]
@@ -1125,6 +1148,22 @@ export default function VideoPlayerModal({
             onContextMenu={(e) => e.preventDefault()}
           >
             {/* ----------------------------------------------------
+                🟢 REAL-TIME LIVE VIEWER COUNTER BADGE
+                ---------------------------------------------------- */}
+            <div 
+              style={{
+                top: "16px",
+                right: "16px",
+                pointerEvents: "none",
+              }}
+              className="absolute z-50 select-none px-2.5 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10 shadow-lg text-white font-sans text-[11px] font-black tracking-wide flex items-center gap-1.5 transition-all duration-300"
+              id="live-viewer-player-badge"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>🟢 {toBanglaNumber(liveViewers)} জন দেখছেন</span>
+            </div>
+
+            {/* ----------------------------------------------------
                 VIRALBD99 TEXT WATERMARK (🔄 SHIFTING WITHIN TOP-RIGHT DRUM)
                 ---------------------------------------------------- */}
             <div 
@@ -1637,10 +1676,20 @@ export default function VideoPlayerModal({
 
 
             <div className="flex flex-wrap items-center gap-3 justify-between py-1.5 border-b border-t border-white/5 text-xs text-slate-400 font-mono">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <span className="flex items-center gap-1">
                   <Eye className="w-4 h-4 text-slate-500" />
                   <span>{(video.views || 0).toLocaleString()} views</span>
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>{getRelativeTimeBangla(video.createdAt || video.scheduledAt || new Date().toISOString())}</span>
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-emerald-400 font-bold shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>🟢 {toBanglaNumber(liveViewers)} জন দেখছেন</span>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
@@ -1743,7 +1792,7 @@ export default function VideoPlayerModal({
                 <div className="hidden md:block w-full">
                   <div className="w-full flex flex-col items-center justify-center bg-zinc-900 rounded-xl p-3 border border-white/5 overflow-hidden shadow-sm animate-fade-in" id="banner-desktop-container">
                     <span className="text-[9px] font-mono text-yellow-500 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS / স্পনসরড বিজ্ঞাপন</span>
-                    <div className="w-full bg-white rounded-lg p-2.5 border border-zinc-200 shadow-inner flex items-center justify-center">
+                    <div className="w-[728px] h-[90px] bg-white rounded-lg border border-zinc-200 shadow-inner flex items-center justify-center overflow-hidden">
                       <AdPlacement code={adSettings.preRollCode || adSettings.bannerVideoTopCode || adSettings.banner728x90Code || ""} type="728x90" />
                     </div>
                   </div>
@@ -1753,11 +1802,15 @@ export default function VideoPlayerModal({
                 <div className="block md:hidden w-full">
                   <div className="w-full flex flex-col items-center justify-center bg-zinc-900 rounded-xl p-2.5 border border-white/5 overflow-hidden shadow-sm animate-fade-in" id="banner-mobile-container">
                     <span className="text-[9px] font-mono text-yellow-400 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS / স্পনসরড বিজ্ঞাপন</span>
-                    <div className="w-full bg-white rounded-lg p-2 border border-zinc-200 shadow-inner flex flex-col items-center justify-center max-w-full overflow-hidden">
+                    <div className="bg-white rounded-lg border border-zinc-200 shadow-inner flex flex-col items-center justify-center max-w-full overflow-hidden shrink-0">
                       {adSettings.preRollCode || adSettings.bannerMobileBottomCode || adSettings.banner320x50Code ? (
-                        <AdPlacement code={adSettings.preRollCode || adSettings.bannerMobileBottomCode || adSettings.banner320x50Code || ""} type="320x50" />
+                        <div className="w-[320px] h-[50px] overflow-hidden flex items-center justify-center">
+                          <AdPlacement code={adSettings.preRollCode || adSettings.bannerMobileBottomCode || adSettings.banner320x50Code || ""} type="320x50" />
+                        </div>
                       ) : (
-                        <AdPlacement code={adSettings.banner300x250Code || ""} type="300x250" />
+                        <div className="w-[300px] h-[250px] overflow-hidden flex items-center justify-center">
+                          <AdPlacement code={adSettings.banner300x250Code || ""} type="300x250" />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1815,8 +1868,10 @@ export default function VideoPlayerModal({
                         <h4 className="text-slate-200 text-xs font-bold line-clamp-2 leading-tight group-hover:text-[#f5c518] [word-break:break-word]">
                           {item.title}
                         </h4>
-                        <span className="text-[9px] font-mono text-slate-500 mt-1.5 block shrink-0">
-                          👁️ {toBanglaNumber(item.views || 0)} views
+                        <span className="text-[9px] font-mono text-slate-500 mt-1.5 flex flex-wrap items-center gap-1 shrink-0">
+                          <span>👁️ {toBanglaNumber(item.views || 0)} views</span>
+                          <span>•</span>
+                          <span>{getRelativeTimeBangla(item.createdAt || item.scheduledAt || new Date().toISOString())}</span>
                         </span>
                       </div>
                     </div>
@@ -2053,8 +2108,10 @@ export default function VideoPlayerModal({
                       <h4 className="text-slate-200 text-xs font-bold line-clamp-1 group-hover:text-[#f5c518] tracking-tight [word-break:break-word]">
                         {item.title}
                       </h4>
-                      <span className="text-[10px] font-mono text-slate-500 mt-1 block">
-                        👁️ {toBanglaNumber(item.views || 0)} views
+                      <span className="text-[10px] font-mono text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                        <span>👁️ {toBanglaNumber(item.views || 0)} views</span>
+                        <span>•</span>
+                        <span>{getRelativeTimeBangla(item.createdAt || item.scheduledAt || new Date().toISOString())}</span>
                       </span>
                     </div>
                   </div>

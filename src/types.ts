@@ -16,6 +16,8 @@ export interface Video {
   isTrending?: boolean;
   isLatest?: boolean;
   createdAt?: string; // ISO string
+  scheduledAt?: string; // ISO string for future publishing
+  status?: "published" | "scheduled"; // Publishing state
   tags?: string; // Comma separated tags e.g. "dance, viral, premium"
   likes?: number;
   dislikes?: number;
