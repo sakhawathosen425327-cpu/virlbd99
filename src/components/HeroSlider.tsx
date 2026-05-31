@@ -148,7 +148,7 @@ export default function HeroSlider({ trendingVideos, onPlayVideo }: HeroSliderPr
 
         {/* Short description */}
         <p className="text-[#aaaaaa] text-xs sm:text-sm max-w-md my-0.5 line-clamp-2 leading-relaxed pb-1">
-          {currentVideo.description || "ViralBD99-এ এক্সক্লুসিভ স্ট্রিমিং ও বাফারিং-মুক্ত স্পেশাল ভিডিও উপভোগ করুন।"}
+          {currentVideo.description || "Enjoy exclusive high-definition video streams with zero-buffering premium playback technology on ViralBD99."}
         </p>
 
         {/* Action button */}
@@ -158,7 +158,7 @@ export default function HeroSlider({ trendingVideos, onPlayVideo }: HeroSliderPr
           className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#f5c518] hover:bg-[#ffe042] text-black font-extrabold text-xs rounded shadow-lg cursor-pointer transform duration-150 active:scale-95"
         >
           <Play className="w-4.5 h-4.5 fill-black text-black" />
-          <span>▶ এখনই দেখুন</span>
+          <span>▶ Play Now</span>
         </button>
 
         {/* Navigation Indicator Dots */}

@@ -144,6 +144,12 @@
         },
         "whatsappUrl": {
           "type": "string"
+        },
+        "bannerSocialEnabled": {
+          "type": "boolean"
+        },
+        "bannerSocialCode": {
+          "type": "string"
         }
       },
       "required": [
@@ -226,9 +232,50 @@
         "preRollSkipped",
         "directLinkFired"
       ]
+    },
+    "VisitorStat": {
+      "title": "Visitor Stat Entity",
+      "description": "Represents an individual visitor statistic value.",
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "The numeric value of the statistic."
+        }
+      },
+      "required": ["value"]
+    },
+    "NotificationItem": {
+      "title": "Notification Item",
+      "description": "A scrollable live notification or broadcast message.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "text", "active"]
     }
   },
   "firestore": {
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Real-time scrollable admin broadcast messages."
+    },
+    "/notifications/list/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Subcollection alignment for live announcments."
+    },
+    "/visitorStats/{statId}": {
+      "schema": "VisitorStat",
+      "description": "Nodes holding individual visitor count values."
+    },
     "/videos/{videoId}": {
       "schema": "Video",
       "description": "Document storage holding active streams accessible page-side."
@@ -252,6 +299,14 @@
     "/adDailyStats/{dateId}": {
       "schema": "DailyAdStats",
       "description": "Holds the counts for ad impressions from various formats grouped by calendar day."
+    },
+    "/comments/{videoId}/list/{commentId}": {
+      "schema": "VideoComment",
+      "description": "User comments for a video."
+    },
+    "/ratings/{videoId}/list/{sessionId}": {
+      "schema": "VideoRating",
+      "description": "User star rating entry for a video."
     }
   }
 }

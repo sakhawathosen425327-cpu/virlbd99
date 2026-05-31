@@ -9,6 +9,7 @@ import {
   Heart, Play, Zap, Key, Eye, Music, Smile, Gamepad, Ghost, Crown, Siren, Camera, Lock
 } from "lucide-react";
 import { Category } from "../types";
+import LiveStatsWidget from "./LiveStatsWidget";
 
 interface HeaderProps {
   categories: Category[];
@@ -19,6 +20,9 @@ interface HeaderProps {
   firebaseOnline: boolean;
   bookmarksCount?: number;
   onViewBookmarks?: () => void;
+  siteLogoText?: string;
+  welcomeMessage?: string;
+  onLogoClick?: () => void;
 }
 
 // Map slug/iconName to lucide icons
@@ -54,7 +58,10 @@ export default function Header({
   searchQuery,
   onSearchChange,
   bookmarksCount = 0,
-  onViewBookmarks
+  onViewBookmarks,
+  siteLogoText = "VIRALBD99",
+  welcomeMessage,
+  onLogoClick
 }: HeaderProps) {
   const [showSearch, setShowSearch] = useState(false);
 
@@ -63,11 +70,14 @@ export default function Header({
       <div className="px-4 py-3.5 flex items-center justify-between max-w-7xl mx-auto gap-4">
         
         {/* Branding */}
-        <div className="flex items-center gap-2 flex-shrink-0" id="branding-container">
+        <div 
+          className="flex items-center gap-2 flex-shrink-0 select-none text-slate-100" 
+          id="branding-container"
+        >
           <span className="text-2xl font-black tracking-tighter uppercase italic text-[#f5c518]">
-            VIRALBD99
+            {siteLogoText}
           </span>
-          <span className="bg-[#f5c518] text-black text-[9px] font-black px-1.5 py-0.5 rounded ml-1 animate-pulse select-none">
+          <span className="bg-[#f5c518] text-black text-[9px] font-black px-1.5 py-0.5 rounded ml-1 animate-pulse">
             18+
           </span>
         </div>
@@ -77,7 +87,7 @@ export default function Header({
           <div className="relative">
             <input
               type="text"
-              placeholder="সার্চ করুন..."
+              placeholder="Search videos..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full bg-[#1a1a1a] border border-[#222222] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-100 placeholder-[#aaaaaa] focus:outline-[#f5c518] focus:border-[#f5c518] transition-all"
@@ -108,10 +118,10 @@ export default function Header({
           <button
             onClick={() => onViewBookmarks && onViewBookmarks()}
             className="p-2 rounded-lg bg-[#1a1a1a] border border-[#222222] text-[#aaaaaa] hover:text-[#f5c518] flex items-center gap-1.5 cursor-pointer relative transition duration-150 active:scale-95"
-            title="সেভ করা ভিডিও"
+            title="Saved Videos"
           >
             <Bookmark className="w-4 h-4 text-[#f5c518] fill-[#f5c518]" />
-            <span className="text-[11px] font-bold hidden xs:inline text-white">সেভড</span>
+            <span className="text-[11px] font-bold hidden xs:inline text-white">Saved</span>
             {bookmarksCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#f5c518] border border-[#111111] text-black text-[9px] font-black rounded-full flex items-center justify-center px-1">
                 {bookmarksCount}
@@ -120,6 +130,8 @@ export default function Header({
           </button>
         </div>
       </div>
+
+      <LiveStatsWidget welcomeMessage={welcomeMessage} />
 
       {/* Dynamic Categories Row */}
       <div className="w-full bg-[#0a0a0a] py-1.5 border-t border-[#222222]" id="header-categories-row">
@@ -133,7 +145,7 @@ export default function Header({
             }`}
           >
             <Video className="w-3.5 h-3.5" />
-            <span>সব ভিডিও</span>
+            <span>All Videos</span>
           </button>
 
           {categories.map((cat) => {

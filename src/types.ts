@@ -103,6 +103,8 @@ export interface AdSettings {
   bannerSidebarCode?: string;
   bannerMobileBottomEnabled?: boolean;
   bannerMobileBottomCode?: string;
+  bannerSocialEnabled?: boolean;
+  bannerSocialCode?: string;
 }
 
 export interface DailyAdStats {
@@ -133,3 +135,41 @@ export interface ActivityLog {
   timestamp: string; // ISO string
   details: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  text: string;
+  active: boolean;
+}
+
+export interface VideoRating {
+  id: string; // `${videoId}_${sessionId}`
+  videoId: string;
+  rating: number; // 1 to 5
+  sessionId: string;
+  timestamp: string;
+}
+
+export interface VideoRatingStats {
+  averageRating: number;
+  totalRatings: number;
+  userRating: number | null;
+}
+
+export interface SiteSettings {
+  id: string; // "global"
+  title: string;
+  logoText: string;
+  maintenanceMode: boolean;
+  welcomeMessage: string;
+}
+
+export interface FirebaseBannerAd {
+  id: string;
+  name: string;
+  code: string;
+  position: "top" | "middle" | "bottom";
+  isEnabled: boolean;
+  type: "728x90" | "300x250" | "320x50";
+}
+

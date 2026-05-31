@@ -18,24 +18,24 @@ export default function SmartCategoryFilter({
   const filters = [
     {
       slug: "latest",
-      label: "⏱️ লেটেস্ট (Latest)",
-      desc: "সদ্য আপলোড করা ভিডিও",
+      label: "⏱️ Latest Hits",
+      desc: "Freshly uploaded streams",
       icon: Clock,
       color: "from-blue-500 to-indigo-600",
       glowColor: "rgba(59, 130, 246, 0.45)",
     },
     {
       slug: "trending",
-      label: "🔥 ট্রেন্ডিং (Trending)",
-      desc: "জনপ্রিয় ও সর্বোচ্চ ভিউড",
+      label: "🔥 Now Trending",
+      desc: "Most viral & highly viewed",
       icon: Flame,
       color: "from-orange-500 to-red-600",
       glowColor: "rgba(239, 68, 68, 0.45)",
     },
     {
       slug: "viral",
-      label: "⚡ ভাইরাল (Viral)",
-      desc: "চরম কাঁপানো ভাইরাল ক্লিপস",
+      label: "⚡ Ultra Viral",
+      desc: "Sensational premium media",
       icon: Zap,
       color: "from-[#f5c518] to-amber-500",
       glowColor: "rgba(245, 197, 24, 0.45)",
@@ -51,10 +51,10 @@ export default function SmartCategoryFilter({
           <div className="w-2.5 h-8 bg-gradient-to-b from-[#f5c518] to-amber-500 rounded-full shrink-0" />
           <div>
             <h4 className="text-xs font-black text-white uppercase tracking-wider font-sans">
-              স্মার্ট ফিল্টার (Smart Filter)
+              Smart Filter
             </h4>
             <p className="text-[10px] text-[#aaaaaa] font-mono">
-              ক্লিপ ক্যাটাগরি সুইচ করুন
+              Select video categories
             </p>
           </div>
         </div>

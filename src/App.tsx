@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Sliders, Tv, Film, Download, X, Info, ShieldCheck, FileText, Mail, Heart, Globe, AlertTriangle, ExternalLink, Send, Facebook, MessageCircle, Flame, Clock, Sparkles, Award, History, Bookmark, Trash2, Play, User } from "lucide-react";
-import { Video, Category, AdSettings, ViewTab, ActivityLog } from "./types";
+import { Video, Category, AdSettings, ViewTab, ActivityLog, SiteSettings, FirebaseBannerAd } from "./types";
 import { 
   getVideos, 
   getCategories, 
@@ -21,7 +21,12 @@ import {
   updateAdminSecurity,
   addActivityLog,
   getActivityLogs,
-  incrementDailyAdStat
+  incrementDailyAdStat,
+  getSiteSettings,
+  updateSiteSettings,
+  getFirebaseBanners,
+  saveFirebaseBanner,
+  deleteFirebaseBanner
 } from "./services/db";
 
 import Header from "./components/Header";
@@ -35,106 +40,66 @@ const AdminPanel = React.lazy(() => import("./components/AdminPanel"));
 const VideoPlayerModal = React.lazy(() => import("./components/VideoPlayerModal"));
 
 const PRELOADER_MESSAGES = [
-  "🔞 সার্ভার গরম হচ্ছে! একটু ধৈর্য ধরুন...",
-  "🍿 হেডফোন কানেক্ট করুন, চরম কিছু আসছে...",
-  "🤫 চারপাশ খেয়াল করুন, ভিডিও প্লে হতে যাচ্ছে...",
-  "⚡ বাফারিং ছাড়া কাঁপানো সব ভিডিও লোড হচ্ছে...",
-  "🔒 আপনার গোপন কানেকশনটি সিকিউর করা হচ্ছে...",
-  "🍓 নিষিদ্ধ ট্রেইলার ব্যাকএন্ডে কম্পাইল হচ্ছে...",
-  "🍒 একদম এক্সক্লুসিভ কালেকশন প্রসেস করা হচ্ছে...",
-  "🚀 সুপারফাস্ট প্রিমিয়াম সার্ভার কানেক্টেড...",
-  "🔥 আজকের সেরা ট্রেন্ডিং ভিডিও রেডি হচ্ছে...",
-  "👀 গোপন চোখ থেকে নিজেকে আড়াল করে নিন...",
-  "💣 হাই-স্পিড ভিডিও স্ট্রিমিং বাফার হচ্ছে...",
-  "🎬 থ্রিলিং সিনেমা লোড হচ্ছে, লাইট অফ করুন...",
-  "💖 স্পেশাল রিলস সিক্রেট ডাটাবেজ ডিক্রিপ্ট হচ্ছে...",
-  "🤫 দরজা বন্ধ করুন, হট এপিসোড শুরু হচ্ছে...",
-  "🥂 আনলিমিটেড এন্টারটেইনমেন্ট লিংক জেনারেট হচ্ছে...",
-  "📲 মোবাইল স্ক্রিন ঘুরিয়ে ফুল স্ক্রিন মুড অন করুন...",
-  "🛡️ ১৮+ প্রক্সি প্রোটোকল অ্যাক্টিভেট করা হচ্ছে...",
-  "👑 প্রিমিয়াম ওটিটি কন্টেন্ট ফ্রিতে আনলক হচ্ছে...",
-  "🥵 আজকের চরম আবহাওয়া সার্ভারে হিট বাড়াচ্ছে...",
-  "✨ আল্ট্রা এইচডি ক্লারিটি অডিও অপ্টিমাইজড হচ্ছে...",
-  "🍿 পপকর্ন নিয়ে বসুন, রোমাঞ্চ শুরু হতে যাচ্ছে...",
-  "🎟️ হাই-ভোল্টেজ ড্রামা লোডিং সিকোয়েন্স...",
-  "🎭 আপনার মুড অনুযায়ী ভিডিও সিলেক্ট করা হচ্ছে...",
-  "🔥 ইন্টারনেট স্পিড চ্যাক হচ্ছে, রোমাঞ্চ দ্বিগুণ হচ্ছে...",
-  "🌟 রাত ১০টার পর যা দেখার তাই লোড হচ্ছে...",
-  "🔒 কন্টেন্ট ডিলিট হওয়ার আগেই চটজলদি দেখে নিন...",
-  "📡 গ্লোবাল ক্লাউড নেটওয়ার্ক থেকে প্রক্সি রেডি...",
-  "🍓 কাঁপানো স্পেশাল ক্লিপস রেডি করা হচ্ছে...",
-  "🔞 অ্যাডাল্ট ক্যাটাগরির হট সার্ভার সচল হচ্ছে...",
-  "🍿 বিরতিহীন স্ট্রিমিংয়ের জন্য মেমোরি ক্লিন হচ্ছে...",
-  "⚡ সুপার রানিং ডাটা ব্যান্ডউইথ সেটআপ...",
-  "🤫 সাউন্ড সিস্টেম চেক করে ভলিউম কমিয়ে নিন...",
-  "🍒 টক-মিষ্টি এক্সক্লুসিভ ক্লিপ লোড হচ্ছে...",
-  "💖 স্পেশাল সিক্রেট ফোল্ডার আনলক করতে একটু অপেক্ষা করুন...",
-  "🚀 ফাস্টেস্ট ক্লাউড গেটওয়ে দিয়ে ডাটা আসছে...",
-  "🎬 মেকিং অ্যান্ড আনকাট সিন লোডিং চলছে...",
-  "🥵 হৃদস্পন্দন বেড়ে গেলে আমাদের দোষ নেই...",
-  "📱 এইচডি কোয়ালিটি মোবাইল ফ্রেন্ডলি হচ্ছে...",
-  "🛡️ ১০০% সুরক্ষিত এবং এনক্রিপ্টেড পথ চালু...",
-  "🍓 মিষ্টি প্রেমের হট এপিসোড আনপ্যাক হচ্ছে...",
-  "🎧 কানের ইয়ারফোন খুলে না থাকলে এখনই লাগান...",
-  "🔒 আইপি হাইড করে ফাস্টার ভিউয়িং এনাবলড...",
-  "⚡ লাইভ স্ট্রিমিং ট্র্যাকার এনাবল্ড হচ্ছে...",
-  "🔞 আজ রাতের আকর্ষণীয় ড্রামা প্রিমিয়ার হচ্ছে...",
-  "🎬 আনসেন্সরড স্ট্রিমিং ডাটা সিঙ্ক হচ্ছে...",
-  "🍿 সিনেমার সবচেয়ে বোল্ড সিনগুলো চেক হচ্ছে...",
-  "🤫 চারপাশের লোকজনের লুকিয়ে তাকানো এড়াতে স্ক্রিন ছোট করুন...",
-  "🍒 সব লিমিটেড অ্যাক্সেস লিংক ফ্রি করা হচ্ছে...",
-  "🔥 হাই-ডিমান্ড ভিডিও বাফারিং সমাধান করা হচ্ছে...",
-  "🚀 সুপার সিড ড্রাইভ থেকে ফাইল রিকভারড...",
-  "🥵 সার্ভারে একটু বেশি লোড, কারণ কন্টেন্ট চরম খতরনাক...",
-  "🎬 নতুন ভাইরাল ভিডিওটির এইচডি প্রিন্ট রেডি...",
-  "💖 মনের মাঝে ঝড় তোলার মতো সিন প্রস্তুত হচ্ছে...",
-  "🤫 গোপনে দেখার জন্য সেফ ব্রাউজার ইনজেকশন...",
-  "🍿  হাই-বিটরেট ওভি ক্রোম রেন্ডারার চালু...",
-  "⚡ ডাটা ইউজেস অপ্টিমাইজেশন প্রক্রিয়া সচল...",
-  "🔞 কোনো রেজিস্ট্রেশন ছাড়াই ডিরেক্ট প্রবেশ...",
-  "🍓 দারুণ রোমান্টিক থ্রিল রিং রিলিজ হচ্ছে...",
-  "🎬 আপনার ফেভারিট মডেলের রিলস লোড হচ্ছে...",
-  "🍒 রসালো এপিসোডের ক্লাউড ব্যাকআপ রেডি...",
-  "🔒 আপনার ব্রাউজিং হিস্টোরি সুরক্ষিত রাখা হচ্ছে...",
-  "🚀 ১ সেকেন্ডের মধ্যে সুপার প্লে লিংকের আগমন...",
-  "🥵 অতিরিক্ত গরমের জন্য সার্ভার ফ্যান চলছে...",
-  "🎧 থ্রিডি অডিও বিটস এনহ্যান্স করা হচ্ছে...",
-  "🍿 আপনার জন্য স্পেশাল কিউরেটেড প্লেলিস্ট...",
-  "🤫 চুপিচুপি দেখার সেরা সাইট লোড হচ্ছে...",
-  "⚡ আনলিমিটেড ব্যান্ডউইথ অ্যালোকেশন সক্রিয়...",
-  "🔞 ১৮ বছরের নিচে কারোর ঢোকা নিষেধ করা হচ্ছে...",
-  "🎬 আনকাট এডিট প্যানেল থেকে ফাইনাল আউটপুট...",
-  "🍓 মনের খিদে মেটানোর সেরা সিনেমা প্রস্তুত...",
-  "🥵 চোখ ধাঁধানো সব দৃশ্যের হাই কোয়ালিটি রেন্ডার...",
-  "💖 ভালো লাগার মুহূর্তগুলো ফ্রেমবন্দি হচ্ছে...",
-  "🔒 নিরাপদ ও বেনামী কান্ট্রি আইপি কানেক্টেড...",
-  "🚀 বিন্দুমাত্র ল্যাগ ছাড়া লোড হওয়া নিশ্চিত হচ্ছে...",
-  "📱 সব ডিভাইসের স্ক্রিন রেশিও অপ্টিমাইজিং...",
-  "🍒 প্রিমিয়াম রিল ভিউয়ার্সদের জন্য ফ্রি এক্সেস...",
-  "🍿 ব্যাকগ্রাউন্ডে পপআপ অ্যাড নিয়ন্ত্রণ করা হচ্ছে...",
-  "⚡ বিদ্যুতের গতিতে স্ট্রিমিং পোর্ট জেনারেটড...",
-  "🔞 হট ট্রেন্ডস ও ভাইরাল ভিডিও ক্লিপ লোডিং...",
-  "🎬 সম্পূর্ণ নতুন ডিরেক্টরের স্পেশাল কাট...",
-  "🥵 চরম উত্তেজনাকর ক্লাইম্যাক্স সিন সিঙ্ক হচ্ছে...",
-  "🤫 চোখ কান খোলা রাখুন, মনের দরজা খুলে দিন...",
-  "💖 আপনার নিঃসঙ্গ সময় কাটানোর উপযুক্ত কন্টেন্ট...",
-  "🔒 ওটিটি পাসওয়ার্ড বাইপাস সফল হয়েছে...",
-  "🚀 ডিরেক্ট প্লে সার্ভার-০৭ কানেক্ট করা হলো...",
-  "🍓 জাদুকরী রোমান্স ও ড্রামা ক্লিপ আনপ্যাকড...",
-  "🍿 সব ওল্ড অ্যান্ড নিউ কালেকশন ইনডেক্সিং হচ্ছে...",
-  "⚡ প্রসেসর স্পিড টিউনিং ফর বেস্ট ফ্রেমরেট...",
-  "🔞 টপ সিক্রেট কন্টেন্ট গ্যালারি উন্মুক্ত হচ্ছে...",
-  "🎬 আপনার চরম ভালো লাগার মুহূর্ত রেডি হচ্ছে...",
-  "🥵 সার্ভারের টেম্পারেচার এখন পিক লেভেলে...",
-  "🤫 সাবধানে দেখুন, কেউ যেন দেখে না ফেলে...",
-  "🍒 একদম এক্সক্লুসিভ অ্যান্ড ফ্রেশ আপলোডস...",
-  "🔒 প্রাইভেট স্ট্রিমিং টানেল ওপেন হচ্ছে...",
-  "🚀 হাই মেমোরি ক্যাশ ডাটা এনাবলিং...",
-  "🎬 সুপার ভাইরাল ক্লিপটি ডাটাবেজে যুক্ত হলো...",
-  "🍿 ভিডিও ডাউনলোডার ইমারসিভ প্রক্সি রেডি...",
-  "⚡ সেরা স্পিড সার্ভার দিয়ে কানেক্ট হচ্ছে...",
-  "🍓 চোখ ভরে দেখার দারুণ কিছু আসছে...",
-  "🔒 ১০০% ফ্রিতে ফুল এইচডি কন্টেন্ট গেটওয়ে অ্যাক্টিভেটেড..."
+  "🔞 Servers warming up! Please be patient...",
+  "🍿 Connect headphones, something absolute is coming...",
+  "🤫 Look around you, video is about to load...",
+  "⚡ Unlimited bandwidth allocation active...",
+  "🔒 Securing your anonymous connections...",
+  "🍓 Compiling the forbidden hot trailers...",
+  "🍒 Processing high premium collections...",
+  "🚀 Fastest CDN servers now connected...",
+  "🔥 Top viral video of today is preparing...",
+  "👀 Hiding your session from nosy onlookers...",
+  "💣 High-speed buffering sequences active...",
+  "🎬 Load completed, turn down the lights...",
+  "💖 Decrypting secret server vaults...",
+  "🤫 Close the doors, main reel starting...",
+  "🥂 Generating continuous play links...",
+  "📲 Rotate your screen for immersive theatre...",
+  "🛡️ 18+ safe proxy protocols loaded...",
+  "👑 Premium VIP titles bypassing key constraints...",
+  "🥵 Server room heat rising to peak levels...",
+  "✨ Ultra HD sound engineering optimized...",
+  "🍿 Grab your snacks, the thrill is real...",
+  "🎟️ High-voltage sequences indexing...",
+  "🎭 Selecting custom media tailored for your mood...",
+  "🔥 Network latency under 5ms, speed doubled...",
+  "🌟 Night edition collection index bypass...",
+  "🔒 Watch online before it gets deleted...",
+  "📡 Premium proxy connections ready...",
+  "🍓 Exotic new shorts compiling...",
+  "🔞 Adult servers turning highly responsive...",
+  "🍿 Purging cached buffers for endless play...",
+  "⚡ High-speed bandwidth routing active...",
+  "🤫 Turn down your device volume slightly...",
+  "🍒 Sweet romantic edits compiling...",
+  "💖 Secret categories unlocking, please stand by...",
+  "🚀 Instant data routing via lightning gate...",
+  "🎬 Behind the scenes uncut versions indexing...",
+  "🥵 Don't blame us if your heart beat rises...",
+  "📱 Responsive aspect ratio optimization done...",
+  "🛡️ Encrypted tunnel activated successfully...",
+  "🍓 Special spicy clips unpacking...",
+  "🎧 Put on your headphones if they are not already on...",
+  "🔒 Hiding your IP address of origin...",
+  "⚡ Live tracking systems bypassed...",
+  "🔞 Tonight's feature presentation loading...",
+  "🎬 Processing uncut stream segments...",
+  "🍿 Filtering the absolute boldest clips...",
+  "🤫 Shrink the player to look completely safe...",
+  "🍒 Re-indexing all secret member collections...",
+  "🔥 Zero-lag server routing activated...",
+  "🚀 Retrieving content from secure Cloud drive...",
+  "🥵 Content is super hot, server room fans boosting...",
+  "🎬 Fresh viral files indexed successfully...",
+  "💖 Generating unforgettable interactive frame...",
+  "🤫 Safe incognito session verified...",
+  "🍿 Running high-bitrate AV1 decode...",
+  "⚡ Optimal frame rate tuning processed...",
+  "🔞 Direct entrance without signup allowed...",
+  "🍓 Exclusive romantic thrillers unpacking...",
+  "🎬 Loading your favorite model's private list...",
+  "🍒 Hot episodes cloud catalog mirroring..."
 ];
 
 export default function App() {
@@ -177,6 +142,15 @@ export default function App() {
     facebookUrl: "https://facebook.com/viralbd99",
     whatsappUrl: "https://whatsapp.com/channel/viralbd99"
   });
+
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    id: "global",
+    title: "ViralBD99 - Pure Premium Streaming Platform",
+    logoText: "VIRALBD99",
+    maintenanceMode: false,
+    welcomeMessage: "Welcome to ViralBD99! Keep watching for the newest exclusive clips..."
+  });
+  const [dbBanners, setDbBanners] = useState<FirebaseBannerAd[]>([]);
 
   // Session click monitor for frequency capping
   const [sessionClicks, setSessionClicks] = useState(0);
@@ -286,7 +260,7 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
-  const [loginStep, setLoginStep] = useState(1); // 1 = Secret knock, 2 = Password
+  const [loginStep, setLoginStep] = useState(2); // 1 = Secret knock, 2 = Password
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [lockoutSecs, setLockoutSecs] = useState<number>(0);
   const [activityLogsList, setActivityLogsList] = useState<ActivityLog[]>([]);
@@ -347,10 +321,10 @@ export default function App() {
       let updated;
       if (prev.includes(id)) {
         updated = prev.filter((item) => item !== id);
-        setShowToast("ভিডিওটি সেভ থেকে সরানো হয়েছে।");
+        setShowToast("Video removed from bookmarks.");
       } else {
         updated = [...prev, id];
-        setShowToast("ভিডিওটি সফলভাবে সেভ করা হয়েছে!");
+        setShowToast("Video bookmarked successfully!");
       }
       localStorage.setItem("viralbd99_bookmarks", JSON.stringify(updated));
       return updated;
@@ -467,12 +441,7 @@ export default function App() {
   useEffect(() => {
     const checkRoutesAndHotkeys = () => {
       const pathname = window.location.pathname;
-      if (pathname === "/admin") {
-        // Redirect standard /admin attempts to homepage immediately
-        window.history.replaceState(null, "", "/");
-        setCurrentTab(ViewTab.HOME);
-        setIsAdminMode(false);
-      } else if (pathname === "/admin-shamim27") {
+      if (pathname === "/admin" || pathname === "/admin-shamim27") {
         setIsAdminMode(true);
         setCurrentTab(ViewTab.ADMIN);
       }
@@ -508,10 +477,12 @@ export default function App() {
         setFirebaseOnline(isOnline);
 
         // Retrieve resources
-        const [fetchedVideos, fetchedCategories, fetchedAdSettings] = await Promise.all([
+        const [fetchedVideos, fetchedCategories, fetchedAdSettings, fetchedSiteSettings, fetchedBanners] = await Promise.all([
           getVideos(),
           getCategories(),
-          getAdSettings()
+          getAdSettings(),
+          getSiteSettings(),
+          getFirebaseBanners()
         ]);
 
         setVideos(fetchedVideos || []);
@@ -519,6 +490,10 @@ export default function App() {
         if (fetchedAdSettings) {
           setAdSettings(fetchedAdSettings);
         }
+        if (fetchedSiteSettings) {
+          setSiteSettings(fetchedSiteSettings);
+        }
+        setDbBanners(fetchedBanners || []);
       } catch (err) {
         console.error("Baseline fetch sequence interrupted:", err);
       } finally {
@@ -665,7 +640,8 @@ export default function App() {
 
     if (videoId) {
       // Update browser tab title
-      document.title = `${activePlayingVideo.title} | ViralBD99`;
+      const shortTitle = siteSettings.title.includes(" - ") ? siteSettings.title.split(" - ")[0] : siteSettings.title;
+      document.title = `${activePlayingVideo.title} | ${shortTitle}`;
       
       if (currentVideoIdInUrl !== videoId) {
         const newUrl = `${window.location.origin}/video/${videoId}`;
@@ -673,7 +649,7 @@ export default function App() {
       }
     } else {
       // Reset default page title
-      document.title = "ViralBD99 - Pure Premium Streaming Platform";
+      document.title = siteSettings.title;
       
       if (currentVideoIdInUrl) {
         const newUrl = `${window.location.origin}/`;
@@ -827,6 +803,30 @@ export default function App() {
     }
   };
 
+  const handleMaintenanceBypass = async (pass: string) => {
+    try {
+      const securityDoc = await getAdminSecurity();
+      if (pass.trim() === securityDoc.password) {
+        const randToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionObj = {
+          token: randToken,
+          expiresAt: Date.now() + 1 * 60 * 60 * 1000
+        };
+        localStorage.setItem("viralbd99_admin_session", JSON.stringify(sessionObj));
+        sessionStorage.setItem("viralbd99_session_active", "true");
+        setIsLoggedIn(true);
+        setIsAdminMode(true);
+        await addActivityLog("Login", "Admin bypassed maintenance mode screen via system password.");
+        setShowToast("Bypass Successful. Welcome, Admin!");
+        setTimeout(() => setShowToast(null), 3000);
+      } else {
+        alert("Incorrect password!");
+      }
+    } catch (e) {
+      alert("Authentication error!");
+    }
+  };
+
   // ==========================================
   // SECURE ADMIN AUTH SUBMIT & SESSIONS
   // ==========================================
@@ -837,7 +837,7 @@ export default function App() {
 
     const term = adminPasswordInput.trim();
     if (!term) {
-      setAuthErrorMsg("দয়া করে পাসওয়ার্ড প্রবেশ করুন");
+      setAuthErrorMsg("Please enter the password");
       return;
     }
 
@@ -851,7 +851,7 @@ export default function App() {
         if (Date.now() < unt) {
           const diffSecs = Math.ceil((unt - Date.now()) / 1000);
           setLockoutSecs(diffSecs);
-          setAuthErrorMsg("অনেকবার ভুল হয়েছে। 5 মিনিট পর চেষ্টা করুন।");
+          setAuthErrorMsg("Too many incorrect attempts. Please try again in 5 minutes.");
           setCheckingAuthLock(false);
           return;
         }
@@ -874,7 +874,7 @@ export default function App() {
         setIsLoggedIn(true);
         setIsAdminMode(true);
         setAdminPasswordInput("");
-        setLoginStep(1); // Reset step back to secret knock for future reload triggers
+        setLoginStep(2); // Keep password step direct
 
         await addActivityLog("Login", "Admin successfully authenticated from the security portal.");
         loadLogs();
@@ -887,15 +887,15 @@ export default function App() {
           const blockedTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
           await updateAdminSecurity({ failedAttempts: nextFailed, blockedUntil: blockedTime });
           setLockoutSecs(300);
-          setAuthErrorMsg("অনেকবার ভুল হয়েছে। 5 মিনিট পর চেষ্টা করুন।");
+          setAuthErrorMsg("Too many incorrect attempts. Please try again in 5 minutes.");
           await addActivityLog("Block Triggered", "Portal blocked for 5 minutes after 3 consecutive password failures.");
         } else {
           await updateAdminSecurity({ failedAttempts: nextFailed, blockedUntil: "" });
-          setAuthErrorMsg(`ভুল পাসওয়ার্ড! (Attempts: ${nextFailed}/3)`);
+          setAuthErrorMsg(`Incorrect Password! (Attempts: ${nextFailed}/3)`);
         }
       }
     } catch (err) {
-      setAuthErrorMsg("কারিগরি ত্রুটি! আবার চেষ্টা করুন।");
+      setAuthErrorMsg("Technical error! Please try again.");
     } finally {
       setCheckingAuthLock(false);
     }
@@ -911,7 +911,7 @@ export default function App() {
     sessionStorage.removeItem("viralbd99_session_active");
     setIsLoggedIn(false);
     setIsAdminMode(false);
-    setLoginStep(1);
+    setLoginStep(2);
     window.location.replace("/");
   };
 
@@ -1047,6 +1047,49 @@ export default function App() {
     );
   }
 
+  if (siteSettings.maintenanceMode && !isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#070708] flex flex-col items-center justify-center p-6 text-center select-none font-sans text-slate-100">
+        <div className="max-w-md w-full bg-[#0d0d12]/50 border border-white/5 rounded-3xl p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+          <div className="absolute top-0 inset-x-0 h-1 bg-[#f5c518] shadow-[0_0_15px_rgba(245,197,24,0.5)]"></div>
+          
+          <div className="w-16 h-16 bg-[#f5c518]/10 rounded-2xl flex items-center justify-center border border-[#f5c518]/30 mx-auto mb-6">
+            <Sliders className="w-8 h-8 text-[#f5c518] animate-spin" style={{ animationDuration: "12s" }} />
+          </div>
+
+          <h1 className="text-xl font-black uppercase text-white tracking-widest mb-3 font-display">
+            {siteSettings.logoText}
+          </h1>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[9px] font-mono font-bold uppercase tracking-widest mb-6 font-semibold">
+            <span>● Maintenance Mode</span>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed mb-6 font-medium">
+            Our platform is currently undergoing scheduled systems enrichment and structural optimization to serve you better. We will return live within minutes.
+          </p>
+
+          <div className="border-t border-white/5 pt-6 mt-6 flex flex-col items-center gap-4">
+            <span className="text-[10px] font-mono text-slate-400">
+              Are you an Administrator?
+            </span>
+            <button
+              onClick={() => {
+                const pass = window.prompt("Enter Administrator Password:");
+                if (pass) {
+                  handleMaintenanceBypass(pass);
+                }
+              }}
+              className="px-4 py-2 bg-[#1a1a24] hover:bg-[#202030] border border-white/5 hover:border-white/10 rounded-xl text-[10px] text-slate-300 hover:text-white font-mono font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+            >
+              Sign In To System Panel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-[#F5F5F5] font-sans flex flex-col pb-12 overflow-x-hidden relative" id="cineflex-root-shell">
       
@@ -1143,6 +1186,12 @@ export default function App() {
         </div>
       )}
 
+      {siteSettings.maintenanceMode && isLoggedIn && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 text-[#f5c518] py-1.5 px-4 text-center text-[11px] font-mono font-bold flex items-center justify-center gap-2 select-none relative z-50">
+          <span>⚠️ SITE IS UNDER MAINTENANCE MODE (BLOCKED FOR PUBLIC VISITORS, ACTIVE FOR CURRENT SESSION)</span>
+        </div>
+      )}
+
       {/* Primary Header */}
       <Header
         categories={categories}
@@ -1168,27 +1217,28 @@ export default function App() {
           setSearchQuery("");
           setCurrentTab(ViewTab.BOOKMARKS);
         }}
+        siteLogoText={siteSettings.logoText}
+        welcomeMessage={siteSettings.welcomeMessage}
       />
-
-      {/* Sleek Live Viewer Broadcast Badge (Just Below Header) */}
-      <div className="w-full max-w-7xl mx-auto px-4 mt-3 flex justify-end shrink-0" id="site-live-viewers-container">
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-black/60 backdrop-blur-md border border-[#10b981]/15 rounded-full text-emerald-400 text-[10px] sm:text-[11px] font-black select-none shadow-[0_2px_12px_rgba(16,185,129,0.05)] animate-fade-in">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>🟢 {toBanglaNumber(appLiveViewers)} জন দেখছেন</span>
-        </div>
-      </div>
 
       {/* Switchable Viewport Ad Placement banner (Desktop 728x90 vs Mobile 320x50) */}
       {adSettings.isEnabled && adSettings.bannerHomeTopEnabled && (
         <div className="w-full max-w-7xl mx-auto px-4 md:px-0 mt-2 mb-4" id="banner-space-top">
           <div className="hidden md:block">
-            <AdPlacement code={adSettings.bannerHomeTopCode || adSettings.banner728x90Code || ""} type="728x90" />
+            <AdPlacement code={adSettings.bannerHomeTopCode || adSettings.banner728x90Code || ""} type="728x90" dbField="bannerHomeTopCode" />
           </div>
           <div className="block md:hidden">
-            <AdPlacement code={adSettings.bannerMobileBottomCode || adSettings.banner320x50Code || ""} type="320x50" />
+            <AdPlacement code={adSettings.bannerMobileBottomCode || adSettings.banner320x50Code || ""} type="320x50" dbField="bannerMobileBottomCode" />
           </div>
         </div>
       )}
+
+      {/* Custom Database Banners - Top Position */}
+      {dbBanners.filter(b => b.isEnabled && b.position === "top").map(banner => (
+        <div key={banner.id} className="w-full max-w-7xl mx-auto px-4 md:px-0 mt-2 mb-4 flex justify-center" id={`db-banner-top-${banner.id}`}>
+          <AdPlacement code={banner.code} type={banner.type} />
+        </div>
+      ))}
 
       {/* Switchable Viewport Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto py-2">
@@ -1198,9 +1248,9 @@ export default function App() {
               <div>
                 <h1 className="text-sm font-bold text-white flex items-center gap-2">
                   <Bookmark className="w-4 h-4 text-[#f5c518] fill-[#f5c518]" />
-                  <span>সেভ করা ভিডিও (Saved Videos)</span>
+                  <span>Bookmarks (Saved Videos)</span>
                 </h1>
-                <p className="text-[11px] text-slate-400 mt-1">আপনার পছন্দের তালিকায় যুক্ত করা স্পেশাল ভিডিওসমূহ</p>
+                <p className="text-[11px] text-slate-400 mt-1">Your bookmarks and saved videos</p>
               </div>
               
               {bookmarkedIds.length > 0 && (
@@ -1208,13 +1258,13 @@ export default function App() {
                   onClick={() => {
                     setBookmarkedIds([]);
                     localStorage.removeItem("viralbd99_bookmarks");
-                    setShowToast("সকল বুকমার্ক মুছে ফেলা হয়েছে।");
+                    setShowToast("All bookmarks cleared successfully.");
                     setTimeout(() => setShowToast(null), 2500);
                   }}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 text-xs font-bold transition duration-150 border border-red-500/25 cursor-pointer active:scale-95"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>সব মুছুন (Clear All)</span>
+                  <span>Clear All</span>
                 </button>
               )}
             </div>
@@ -1222,8 +1272,8 @@ export default function App() {
             {videos.filter((v) => v.status !== "scheduled" && bookmarkedIds.includes(v.id)).length === 0 ? (
               <div className="text-center py-20 bg-zinc-900/10 border border-dashed border-white/5 rounded-2xl" id="empty-bookmarks-slate">
                 <Bookmark className="w-10 h-10 text-slate-505 mx-auto mb-3" />
-                <p className="text-xs font-bold text-slate-350">আপনি এখনো কোনো ভিডিও সেভ করেননি।</p>
-                <span className="text-[10px] text-zinc-500 block mt-1">যেকোনো ভিডিওর বুকমার্ক আইকনে ক্লিক করে পরবর্তীতে দেখার সুবিধার্থে এখানে সেভ করুন।</span>
+                <p className="text-xs font-bold text-slate-350">You have no saved videos yet.</p>
+                <span className="text-[10px] text-zinc-500 block mt-1">Tap the bookmark icon on any video card to save it for later.</span>
               </div>
             ) : (
               <VideoGrid
@@ -1232,6 +1282,7 @@ export default function App() {
                 bookmarkedIds={bookmarkedIds}
                 onToggleBookmark={handleToggleBookmark}
                 progressMap={progressMap}
+                adSettings={adSettings}
               />
             )}
           </div>
@@ -1256,19 +1307,29 @@ export default function App() {
             {/* Middle homepage banner spacing */}
             {adSettings.isEnabled && adSettings.bannerHomeMiddleEnabled && (adSettings.bannerHomeMiddleCode || adSettings.banner300x250Code) && (
               <div className="w-full flex flex-col justify-center items-center bg-[#121214] p-3.5 rounded-2xl border border-white/5 max-w-sm mx-auto shadow-xl select-none" id="banner-homepage-middle">
-                <span className="text-[8px] font-mono text-[#f5c518] font-black mb-2 tracking-widest uppercase text-center shrink-0">SPONSORED LINKS / বিজ্ঞাপন</span>
+                <span className="text-[8px] font-mono text-[#f5c518] font-black mb-2 tracking-widest uppercase text-center shrink-0">SPONSORED LINKS</span>
                 <div className="w-[300px] h-[250px] overflow-hidden flex items-center justify-center shrink-0">
-                  <AdPlacement code={adSettings.bannerHomeMiddleCode || adSettings.banner300x250Code || ""} type="300x250" />
+                  <AdPlacement code={adSettings.bannerHomeMiddleCode || adSettings.banner300x255Code || adSettings.banner300x250Code || ""} type="300x250" />
                 </div>
               </div>
             )}
+
+            {/* Custom Database Banners - Middle Position */}
+            {dbBanners.filter(b => b.isEnabled && b.position === "middle").map(banner => (
+              <div key={banner.id} className="w-full flex flex-col justify-center items-center bg-[#121214] p-3.5 rounded-2xl border border-white/5 max-w-sm mx-auto shadow-xl select-none" id={`db-banner-middle-${banner.id}`}>
+                <span className="text-[8px] font-mono text-[#f5c518] font-black mb-2 tracking-widest uppercase text-center shrink-0">SPONSORED LINKS</span>
+                <div className="w-full h-auto overflow-hidden flex items-center justify-center shrink-0">
+                  <AdPlacement code={banner.code} type={banner.type} />
+                </div>
+              </div>
+            ))}
 
             {/* 4. TRENDING ROW */}
             {!searchQuery && (
               <div className="px-4 max-w-7xl mx-auto w-full text-left" id="home-trending-carousel-container">
                 <div className="border-l-4 border-[#f5c518] pl-2.5 mb-3">
                   <h3 className="text-sm font-black uppercase text-white font-sans tracking-wide">
-                    🎬 এখন ট্রেন্ডিং (Now Trending)
+                    🎬 Now Trending
                   </h3>
                 </div>
                 
@@ -1310,7 +1371,7 @@ export default function App() {
                             {/* Top-Right: live viewers */}
                             <div className="absolute top-1 right-1 bg-red-600/95 backdrop-blur-sm text-[7px] font-sans text-white px-1 py-0.5 rounded border border-red-500/30 font-bold flex items-center gap-0.5 animate-pulse">
                               <span className="w-1 h-1 rounded-full bg-white inline-block"></span>
-                              {toBanglaNumber(simulatedViewers)}+ দেখছেন
+                              {toBanglaNumber(simulatedViewers)}+ watching
                             </div>
 
                             {/* Center: Play floating pulsing icon */}
@@ -1322,7 +1383,7 @@ export default function App() {
 
                             {/* Bottom high visibility badge */}
                             <div className="absolute bottom-1 inset-x-1 bg-amber-500 text-black text-[6.5px] font-black py-0.5 rounded text-center tracking-tighter uppercase font-sans border border-amber-400 shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-                              ⚡ INSTANT PLAY (পাসওয়ার্ড নেই)
+                              ⚡ INSTANT PLAY (NO PASSWORD)
                             </div>
                           </div>
                           <h4 className="mt-1.5 text-white text-[10.5px] font-bold line-clamp-1 group-hover:text-[#f5c518] leading-tight text-left">
@@ -1354,16 +1415,17 @@ export default function App() {
               <VideoGrid
                 title={
                   searchQuery
-                    ? `🔍 সার্চ ফলাফল: "${searchQuery}"`
+                    ? `🔍 Search Results: "${searchQuery}"`
                     : selectedCategory === "all"
-                      ? "📹 লেটেস্ট ভিডিও"
-                      : `📹 লেটেস্ট ভিডিও - ${categories.find(c => c.slug === selectedCategory)?.name || "Videos"}`
+                      ? "📹 Latest Videos"
+                      : `📹 Latest Videos - ${categories.find(c => c.slug === selectedCategory)?.name || "Videos"}`
                 }
                 videos={filteredList.slice(0, visibleCount)}
                 onPlayVideo={handlePlayVideo}
                 bookmarkedIds={bookmarkedIds}
                 onToggleBookmark={handleToggleBookmark}
                 progressMap={progressMap}
+                adSettings={adSettings}
               />
               
               {/* Load More Indicator/Trigger for infinite scroll */}
@@ -1373,7 +1435,7 @@ export default function App() {
                     onClick={() => setVisibleCount(prev => prev + 8)}
                     className="px-6 py-2 bg-[#1a1a1a] border border-[#222222] rounded-full text-xs text-[#aaaaaa] font-bold hover:bg-[#222222] hover:text-white transition cursor-pointer active:scale-95"
                   >
-                    আরো লোড করুন (Load More)
+                    Load More
                   </button>
                 </div>
               )}
@@ -1438,20 +1500,20 @@ export default function App() {
                         VIRALBD99 Auth Studio
                       </h2>
                       <p className="text-xs text-slate-400 mt-1 pb-4 border-b border-white/5 w-full leading-relaxed">
-                        এডমিন প্যানেলে প্রবেশ করতে আপনার পাসওয়ার্ড দিন
+                        Please enter your password to access the Admin Panel
                       </p>
                     </div>
 
                     <form onSubmit={handlePasswordSubmit} className="mt-5 flex flex-col gap-4">
                       {lockoutSecs > 0 ? (
-                        /* Blocked screen layout with Bengali warning and countdown clock */
+                        /* Blocked screen layout with warning and countdown clock */
                         <div className="p-4 bg-red-950/20 border border-red-500/25 rounded-xl text-center">
                           <AlertTriangle className="w-6 h-6 text-[#f33e3e] mx-auto mb-2 animate-bounce" />
                           <p className="text-xs font-bold text-red-400 font-sans leading-normal">
-                            অনেকবার ভুল হয়েছে। 5 মিনিট পর চেষ্টা করুন।
+                            Too many incorrect attempts. Please try again in 5 minutes.
                           </p>
                           <div className="mt-3 text-xs text-slate-400 font-mono">
-                            অবশিষ্ট সময়: <span className="text-amber-400 font-bold text-sm font-mono ml-1">
+                            Time remaining: <span className="text-amber-400 font-bold text-sm font-mono ml-1">
                               {Math.floor(lockoutSecs / 60)}:{(lockoutSecs % 60).toString().padStart(2, "0")}
                             </span>
                           </div>
@@ -1460,7 +1522,7 @@ export default function App() {
                         <>
                           <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
-                              পাসওয়ার্ড দিন
+                              Enter Password
                             </label>
                             <input
                               type="password"
@@ -1484,7 +1546,7 @@ export default function App() {
                             disabled={checkingAuthLock}
                             className="bg-[#f5c518] hover:bg-[#ffe042] text-black text-xs font-bold py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer disabled:opacity-50 mt-1"
                           >
-                            {checkingAuthLock ? "ভেরিফাই করা হচ্ছে..." : "লগইন করুন"}
+                            {checkingAuthLock ? "Verifying..." : "Login"}
                           </button>
                         </>
                       )}
@@ -1534,6 +1596,13 @@ export default function App() {
         </React.Suspense>
       )}
 
+      {/* Custom Database Banners - Bottom Position */}
+      {dbBanners.filter(b => b.isEnabled && b.position === "bottom").map(banner => (
+        <div key={banner.id} className="w-full max-w-7xl mx-auto px-4 md:px-0 mt-4 mb-4 flex justify-center" id={`db-banner-bottom-${banner.id}`}>
+          <AdPlacement code={banner.code} type={banner.type} />
+        </div>
+      ))}
+
       {/* Dynamic Centered Dark Footer */}
       <footer className="w-full bg-[#08080a] border-t border-white/5 mt-10 md:mt-16 py-10 px-4 sm:px-8 select-none" id="app-footer">
         <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-7">
@@ -1543,9 +1612,9 @@ export default function App() {
             <div className="border-l-4 border-amber-500 pl-2.5 mb-3.5 flex items-center justify-between">
               <div>
                 <h3 className="text-xs sm:text-sm font-black uppercase text-white font-sans tracking-wide">
-                  🏷️ অন্যান্য ক্যাটাগরি (More Categories)
+                  🏷️ More Categories
                 </h3>
-                <p className="text-[9px] text-[#aaaaaa] font-mono mt-0.5">পছন্দের বিভাগ এক্সপ্লোর করুন</p>
+                <p className="text-[9px] text-[#aaaaaa] font-mono mt-0.5">Explore your favorite category</p>
               </div>
               <span className="text-[9px] bg-white/5 text-[#aaaaaa] font-mono px-2 py-0.5 rounded-full select-none border border-white/5">EXPLORE-MODE</span>
             </div>
@@ -1590,7 +1659,7 @@ export default function App() {
                         {cat.name}
                       </span>
                       <span className="text-[8px] text-slate-500 font-mono block mt-0.5">
-                        {toBanglaNumber(videoCount)} ভিডিও
+                        {videoCount} {videoCount === 1 ? "video" : "videos"}
                       </span>
                     </div>
                   </button>
@@ -1601,6 +1670,16 @@ export default function App() {
 
           {/* Spacer & Divider */}
           <div className="w-full h-px bg-white/5 my-1 md:my-2 shrink-0 animate-fade-in" />
+
+          {/* New Ad Banner above Social Buttons */}
+          {adSettings.isEnabled && adSettings.bannerSocialEnabled && (
+            <div className="w-full max-w-sm flex flex-col justify-center items-center bg-black/40 rounded-xl p-1.5 border border-white/5 mx-auto my-3" id="ad-above-social-channels">
+              <span className="text-[7px] font-mono text-amber-500/80 font-bold mb-1 tracking-widest leading-none">SPONSORED LINK</span>
+              <div className="w-[320px] h-[50px] overflow-hidden flex items-center justify-center shrink-0">
+                <AdPlacement code={adSettings.bannerSocialCode} type="320x50" dbField="bannerSocialCode" />
+              </div>
+            </div>
+          )}
           
           {/* Curated Social Community Channels */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 pb-1" id="social-community-channels">
@@ -1640,7 +1719,16 @@ export default function App() {
           <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
-              <span className="text-base font-black font-display text-white tracking-widest uppercase">ViralBD99</span>
+              <span 
+                onClick={() => {
+                  window.history.pushState(null, "", "/admin-shamim27");
+                  setIsAdminMode(true);
+                  setCurrentTab(ViewTab.ADMIN);
+                }}
+                className="text-base font-black font-display text-white tracking-widest uppercase cursor-pointer hover:text-[#f5c518] transition-colors duration-150 select-none"
+              >
+                ViralBD99
+              </span>
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
             </div>
             <p className="text-xs text-slate-400 max-w-sm sm:max-w-md leading-relaxed font-sans">
@@ -1653,7 +1741,7 @@ export default function App() {
             <div className="w-full max-w-xs flex flex-col justify-center items-center bg-black/40 rounded-xl p-1.5 border border-white/5 mx-auto" id="ad-above-warning">
               <span className="text-[7px] font-mono text-amber-500/80 font-bold mb-1 tracking-widest leading-none">SPONSORED LINK</span>
               <div className="w-[320px] h-[50px] overflow-hidden flex items-center justify-center shrink-0">
-                <AdPlacement code={adSettings.banner320x50Code} type="320x50" />
+                <AdPlacement code={adSettings.banner320x50Code} type="320x50" dbField="banner320x50Code" />
               </div>
             </div>
           )}
@@ -1915,11 +2003,11 @@ export default function App() {
             {/* Script Embed wrapper */}
             <div className="flex-grow flex items-center justify-center overflow-hidden max-h-[44px]">
               {adSettings.socialBarCode ? (
-                <AdPlacement code={adSettings.socialBarCode} type="728x90" />
+                <AdPlacement code={adSettings.socialBarCode} type="728x90" dbField="socialBarCode" />
               ) : (
                 <div className="flex items-center gap-2 text-xs text-slate-300 font-sans font-semibold">
                   <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                  <span>ExoClick Social Ad Bar Live integration (পাসওয়ার্ড দিয়ে ট্র্যাকিং সচল আছে)</span>
+                  <span>ExoClick Social Ad Bar Live integration (Tracking active with password)</span>
                 </div>
               )}
             </div>
@@ -1952,7 +2040,7 @@ export default function App() {
             >
               <X className="w-2.5 h-2.5" />
             </button>
-            <AdPlacement code={adSettings.banner320x50Code} type="320x50" />
+            <AdPlacement code={adSettings.banner320x50Code} type="320x50" dbField="banner320x50Code" />
           </div>
         </div>
       )}
@@ -1965,7 +2053,7 @@ export default function App() {
         onSelectCategory={(cat) => setSelectedCategory(cat)}
         onToggleSearch={() => {
           window.scrollTo({ top: 0, behavior: "smooth" });
-          const inp = document.querySelector('input[placeholder="সার্চ করুন..."]') as HTMLInputElement;
+          const inp = document.querySelector('input[placeholder="Search videos..."]') as HTMLInputElement;
           if (inp) inp.focus();
         }}
         onOpenProfile={() => setShowProfileModal(true)}
@@ -2010,19 +2098,19 @@ export default function App() {
 
             <div className="my-5 space-y-3.5 text-left border-t border-b border-[#222222] py-4 font-sans text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-[#aaaaaa] font-bold">18+ অ্যাক্সেস:</span>
+                <span className="text-[#aaaaaa] font-bold">18+ Access:</span>
                 <span className="text-emerald-500 font-extrabold flex items-center gap-1 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> ভেরিফাইড
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Verified
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#aaaaaa] font-bold">সেভড ভিডিওসমূহ:</span>
+                <span className="text-[#aaaaaa] font-bold">Saved Videos:</span>
                 <span className="text-[#f5c518] font-black font-mono bg-[#f5c518]/10 px-2 py-0.5 border border-[#f5c518]/20 rounded">
-                  {bookmarkedIds.length} ক্লিপস
+                  {bookmarkedIds.length} Clips
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#aaaaaa] font-bold">আইডি টোকেন:</span>
+                <span className="text-[#aaaaaa] font-bold">ID Token:</span>
                 <span className="text-white font-mono text-[10px] select-all bg-[#0f0f0f] px-2 py-0.5 border border-[#222222] rounded text-[#aaaaaa]">
                   #VBD99-{(bookmarkedIds.length * 153 + 9982).toString(16).toUpperCase()}
                 </span>
@@ -2037,7 +2125,7 @@ export default function App() {
                 }}
                 className="w-full bg-[#f5c518] hover:bg-[#ffe042] text-black font-black text-xs py-2.5 rounded-lg select-none cursor-pointer transition active:scale-95"
               >
-                আমার বুকমার্কস তালিকা
+                My Saved Bookmarks List
               </button>
             </div>
           </div>

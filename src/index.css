@@ -86,3 +86,22 @@
 .scroll-row::-webkit-scrollbar {
   display: none;
 }
+
+/* ==========================================
+   PERMANENT AD LOCK & IMMUTABLE Z-INDEX RULES
+   (Protects Sponsored Links, Social & Grid Ads)
+   ========================================== */
+.sponsored-ad-slot,
+#banner-space-top,
+#banner-homepage-middle,
+#ad-above-social-channels,
+#sponsored-ad-grid-spot,
+#ad-above-warning {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 50 !important;
+  position: relative !important;
+  max-height: 9999px !important;
+  pointer-events: auto !important;
+}

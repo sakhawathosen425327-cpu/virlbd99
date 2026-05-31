@@ -51,7 +51,7 @@ export default function BottomNav({
                 : "text-[#aaaaaa]"
             }`}
           >
-            হোম
+            Home
           </span>
         </button>
 
@@ -64,7 +64,7 @@ export default function BottomNav({
           className="flex flex-col items-center justify-center w-14 h-full cursor-pointer group"
         >
           <Search className="w-5 h-5 text-[#aaaaaa] group-hover:text-white transition-transform active:scale-90" />
-          <span className="text-[10px] mt-1 text-[#aaaaaa] font-bold">সার্চ</span>
+          <span className="text-[10px] mt-1 text-[#aaaaaa] font-bold">Search</span>
         </button>
 
         {/* ট্রেন্ডিং (Trending) */}
@@ -90,7 +90,7 @@ export default function BottomNav({
                 : "text-[#aaaaaa]"
             }`}
           >
-            ট্রেন্ডিং
+            Trending
           </span>
         </button>
 
@@ -115,7 +115,7 @@ export default function BottomNav({
                 : "text-[#aaaaaa]"
             }`}
           >
-            সেভ
+            Saved
           </span>
           {bookmarksCount > 0 && (
             <span className="absolute top-1 right-2 min-w-[14px] h-3.5 bg-[#f5c518] text-black text-[8px] font-black rounded-full flex items-center justify-center px-0.5">
@@ -130,7 +130,7 @@ export default function BottomNav({
           className="flex flex-col items-center justify-center w-14 h-full cursor-pointer group"
         >
           <User className="w-5 h-5 text-[#aaaaaa] group-hover:text-white active:scale-90" />
-          <span className="text-[10px] mt-1 text-[#aaaaaa] font-bold">প্রোফাইল</span>
+          <span className="text-[10px] mt-1 text-[#aaaaaa] font-bold">Profile</span>
         </button>
       </div>
     </nav>

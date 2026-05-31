@@ -86,7 +86,9 @@ service cloud.firestore {
         && (!data.keys().hasAny(['bannerSidebarEnabled']) || data.bannerSidebarEnabled is bool)
         && (!data.keys().hasAny(['bannerSidebarCode']) || (data.bannerSidebarCode is string && data.bannerSidebarCode.size() <= 50000))
         && (!data.keys().hasAny(['bannerMobileBottomEnabled']) || data.bannerMobileBottomEnabled is bool)
-        && (!data.keys().hasAny(['bannerMobileBottomCode']) || (data.bannerMobileBottomCode is string && data.bannerMobileBottomCode.size() <= 50000));
+        && (!data.keys().hasAny(['bannerMobileBottomCode']) || (data.bannerMobileBottomCode is string && data.bannerMobileBottomCode.size() <= 50000))
+        && (!data.keys().hasAny(['bannerSocialEnabled']) || data.bannerSocialEnabled is bool)
+        && (!data.keys().hasAny(['bannerSocialCode']) || (data.bannerSocialCode is string && data.bannerSocialCode.size() <= 50000));
     }
 
     function isValidDailyAdStats(data) {
@@ -111,6 +113,18 @@ service cloud.firestore {
         && data.action is string && data.action.size() <= 500
         && data.timestamp is string && data.timestamp.size() <= 100
         && data.details is string && data.details.size() <= 5000;
+    }
+
+    function isValidVisitorStat(data) {
+      return data.keys().hasAll(['value'])
+        && data.value is number;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['id', 'text', 'active'])
+        && data.id is string && data.id.size() <= 128
+        && data.text is string && data.text.size() <= 2000
+        && data.active is bool;
     }
 
     // Collection routing Rules
@@ -158,7 +172,8 @@ service cloud.firestore {
           'popunderEnabled', 'directLinkEnabled', 'directLinkIntervalMinutes',
           'bannerHomeTopEnabled', 'bannerHomeTopCode', 'bannerHomeMiddleEnabled', 'bannerHomeMiddleCode',
           'bannerVideoTopEnabled', 'bannerVideoTopCode', 'bannerVideoUnderPlayerEnabled', 'bannerVideoUnderPlayerCode',
-          'bannerSidebarEnabled', 'bannerSidebarCode', 'bannerMobileBottomEnabled', 'bannerMobileBottomCode'
+          'bannerSidebarEnabled', 'bannerSidebarCode', 'bannerMobileBottomEnabled', 'bannerMobileBottomCode',
+          'bannerSocialEnabled', 'bannerSocialCode'
         ])
       );
       allow delete: if isValidId(adId);
@@ -186,6 +201,66 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isValidId(dateId) && isValidDailyAdStats(incoming()) && incoming().id == dateId;
       allow delete: if false;
+    }
+
+    // Live Web Analytics and Session Activity Logs
+    match /analytics/{docId} {
+      allow read, write: if true;
+    }
+
+    // Visitor Stats Rules
+    match /visitorStats/{statId} {
+      allow read: if true;
+      allow create, update: if isValidId(statId) && isValidVisitorStat(incoming());
+      allow delete: if false;
+    }
+
+    // Notifications Rules
+    match /notifications/{docId} {
+      allow read: if true;
+      allow create, update: if isValidId(docId) && isValidNotification(incoming());
+      allow delete: if isValidId(docId);
+      
+      match /list/{subId} {
+        allow read: if true;
+        allow create, update: if isValidId(subId) && isValidNotification(incoming());
+        allow delete: if isValidId(subId);
+      }
+    }
+
+    match /notifications_list/{docId} {
+      allow read: if true;
+      allow create, update: if isValidId(docId) && isValidNotification(incoming());
+      allow delete: if isValidId(docId);
+    }
+
+    match /ratings/{videoId}/list/{sessionId} {
+      allow read: if true;
+      allow create, update: if isValidId(videoId) && isValidId(sessionId)
+        && incoming().id == videoId + "_" + sessionId
+        && incoming().videoId == videoId
+        && incoming().rating >= 1 && incoming().rating <= 5
+        && incoming().sessionId == sessionId;
+      allow delete: if false;
+    }
+
+    match /comments/{videoId}/list/{commentId} {
+      allow read: if true;
+      allow create: if isValidId(videoId) && isValidId(commentId)
+        && incoming().id == commentId
+        && incoming().videoId == videoId;
+      allow update: if isValidId(videoId) && isValidId(commentId);
+      allow delete: if isValidId(videoId) && isValidId(commentId);
+    }
+
+    match /siteConfigs/{docId} {
+      allow read: if true;
+      allow create, update: if isValidId(docId);
+      allow delete: if false;
+    }
+
+    match /banners/{bannerId} {
+      allow read, write: if true;
     }
   }
 }

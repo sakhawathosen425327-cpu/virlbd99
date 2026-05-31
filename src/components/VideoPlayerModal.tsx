@@ -8,9 +8,10 @@ import {
   X, Copy, Share2, Eye, Clock, Check, MessageCircle, Send, 
   Award, Film, Maximize, Flame, Monitor, Smartphone, RotateCcw,
   Play, Pause, FastForward, Rewind, Volume2, VolumeX, Maximize2, Minimize2, Tv, AlertTriangle,
-  ThumbsUp, ThumbsDown, Bookmark, Heart, Trash2, MessageSquare, Flag, SkipBack, SkipForward
+  ThumbsUp, ThumbsDown, Bookmark, Heart, Trash2, MessageSquare, Flag, SkipBack, SkipForward,
+  Star
 } from "lucide-react";
-import { Video, AdSettings, VideoComment, VideoCommentReply } from "../types";
+import { Video, AdSettings, VideoComment, VideoCommentReply, VideoRatingStats } from "../types";
 import AdPlacement from "./AdPlacement";
 import { convertToEmbed } from "./videoHelper";
 import { 
@@ -19,7 +20,9 @@ import {
   addComment, 
   updateComment, 
   deleteComment, 
-  updateVideo 
+  updateVideo,
+  getVideoRatings,
+  submitVideoRating
 } from "../services/db";
 
 interface VideoPlayerModalProps {
@@ -96,9 +99,8 @@ export default function VideoPlayerModal({
   const [showPreRoll, setShowPreRoll] = useState(false);
   const [preRollCountdown, setPreRollCountdown] = useState(adSettings.preRollSkipDelay || 5);
 
-  const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
   const toBanglaNumber = (num: number) => {
-    return String(num).split("").map(d => banglaDigits[parseInt(d, 10)] || d).join("");
+    return Number(num || 0).toLocaleString("en-US");
   };
 
   // ----------------------------------------------------
@@ -126,6 +128,23 @@ export default function VideoPlayerModal({
   const [replyText, setReplyText] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [commentLikeStatuses, setCommentLikeStatuses] = useState<Record<string, boolean>>({});
+
+  // RATINGS STATES
+  const [ratingSessionId] = useState<string>(() => {
+    let id = localStorage.getItem("viralbd99_rating_session");
+    if (!id) {
+      id = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+      localStorage.setItem("viralbd99_rating_session", id);
+    }
+    return id;
+  });
+  const [ratingStats, setRatingStats] = useState<VideoRatingStats>({
+    averageRating: 0,
+    totalRatings: 0,
+    userRating: null
+  });
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   // Real-time live viewer counter logic
   const [liveViewers, setLiveViewers] = useState(() => {
@@ -219,6 +238,29 @@ export default function VideoPlayerModal({
     setComments(fetched);
   };
 
+  // Ratings loader
+  const loadRatings = async () => {
+    try {
+      const stats = await getVideoRatings(video.id, ratingSessionId);
+      setRatingStats(stats);
+    } catch (e) {
+      console.error("loadRatings error:", e);
+    }
+  };
+
+  const handleRatingClick = async (star: number) => {
+    if (isSubmittingRating) return;
+    setIsSubmittingRating(true);
+    try {
+      const stats = await submitVideoRating(video.id, ratingSessionId, star);
+      setRatingStats(stats);
+    } catch (error) {
+      console.error("submitRating error:", error);
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       setWatermarkPosOffset((prev) => (prev + 1) % 4);
@@ -235,6 +277,7 @@ export default function VideoPlayerModal({
     setUserReaction(matchReactions[video.id] || null);
 
     loadComments();
+    loadRatings();
     saveToWatchHistory(video.id);
 
     // Cancel dynamic countdown on active load
@@ -500,7 +543,7 @@ export default function VideoPlayerModal({
         timestamp: new Date().toISOString(),
         likes: 0,
         replies: [],
-        isApproved: false, // approval request mandatory
+        isApproved: true, // displayed instantly matching prompt expectations
         reported: false
       };
       await addComment(newComment);
@@ -529,7 +572,7 @@ export default function VideoPlayerModal({
       };
       const currentReplies = parentComm.replies || [];
       const updatedReplies = [...currentReplies, newReply];
-      await updateComment(parentComm.id, { replies: updatedReplies });
+      await updateComment(parentComm.id, { replies: updatedReplies }, video.id);
       setReplyText("");
       setReplyingToCommentId(null);
       loadComments();
@@ -545,7 +588,7 @@ export default function VideoPlayerModal({
     if (commentLikeStatuses[comm.id]) return;
     try {
       const updatedLikes = (comm.likes || 0) + 1;
-      await updateComment(comm.id, { likes: updatedLikes });
+      await updateComment(comm.id, { likes: updatedLikes }, video.id);
       setCommentLikeStatuses(prev => ({ ...prev, [comm.id]: true }));
       setComments(prev => prev.map(c => c.id === comm.id ? { ...c, likes: updatedLikes } : c));
     } catch (e){}
@@ -554,7 +597,7 @@ export default function VideoPlayerModal({
   // Report comment
   const handleReportComment = async (commId: string) => {
     try {
-      await updateComment(commId, { reported: true });
+      await updateComment(commId, { reported: true }, video.id);
       alert("মন্তব্যটি রিপোর্টেড করা হয়েছে। অ্যাডমিন এটি খুব শীঘ্রই রিভিউ করবেন।");
     } catch (e) {}
   };
@@ -569,11 +612,11 @@ export default function VideoPlayerModal({
     const hours = Math.floor(mins / 60);
     const days = Math.floor(hours / 24);
 
-    if (secs < 60) return "এইমাত্র";
-    if (mins < 60) return `${toBanglaNumber(mins)} মিনিট আগে`;
-    if (hours < 24) return `${toBanglaNumber(hours)} ঘণ্টা আগে`;
-    if (days < 30) return `${toBanglaNumber(days)} দিন আগে`;
-    return new Date(dateStr).toLocaleDateString("bn-BD");
+    if (secs < 60) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 30) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString("en-US");
   };
 
   // Run our smart auto-detect and convert system
@@ -1160,7 +1203,7 @@ export default function VideoPlayerModal({
               id="live-viewer-player-badge"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>🟢 {toBanglaNumber(liveViewers)} জন দেখছেন</span>
+              <span>🟢 {toBanglaNumber(liveViewers)} watching now</span>
             </div>
 
             {/* ----------------------------------------------------
@@ -1470,7 +1513,7 @@ export default function VideoPlayerModal({
             {autoplayCountdownActive && nextVideo && (
               <div className="absolute inset-0 bg-black/95 z-40 flex flex-col items-center justify-center p-4 text-center animate-fade-in font-sans">
                 <div className="max-w-sm w-full bg-zinc-900 border border-white/10 p-5 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
-                  <span className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider animate-pulse">UP NEXT / পরবর্তী আকর্ষণ</span>
+                  <span className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider animate-pulse">UP NEXT</span>
                   
                   {/* Thumbnail frame */}
                   <div className="w-40 aspect-video rounded-lg overflow-hidden border border-white/10 relative shadow-md">
@@ -1491,14 +1534,14 @@ export default function VideoPlayerModal({
                   </div>
 
                   <div className="text-[#f5c518] text-xs font-extrabold bg-[#f5c518]/10 px-4 py-1.5 rounded-full border border-[#f5c518]/20 animate-pulse">
-                    পরবর্তী ভিডিও {toBanglaNumber(autoplayTimeLeft)} সেকেন্ডে শুরু হবে
+                    Next video starting in {toBanglaNumber(autoplayTimeLeft)}s
                   </div>
 
                   <button 
                     onClick={() => setAutoplayCountdownActive(false)}
                     className="mt-1 px-4 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 text-[11px] font-bold transition duration-150 active:scale-95 border border-red-500/20"
                   >
-                    বাতিল করুন (Cancel)
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -1689,7 +1732,7 @@ export default function VideoPlayerModal({
                 <span>•</span>
                 <span className="flex items-center gap-1 text-emerald-400 font-bold shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>🟢 {toBanglaNumber(liveViewers)} জন দেখছেন</span>
+                  <span>🟢 {toBanglaNumber(liveViewers)} watching now</span>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
@@ -1752,7 +1795,7 @@ export default function VideoPlayerModal({
                     title="Bookmark"
                   >
                     <Bookmark className={`w-3.5 h-3.5 ${bookmarkedIds.includes(video.id) ? "fill-yellow-500" : ""}`} />
-                    <span>{bookmarkedIds.includes(video.id) ? "সেভড" : "সেভ করুন"}</span>
+                    <span>{bookmarkedIds.includes(video.id) ? "Saved" : "Save Video"}</span>
                   </button>
                 )}
               </div>
@@ -1763,7 +1806,7 @@ export default function VideoPlayerModal({
                   onClick={handleCopyLink}
                   className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/5 rounded-lg text-xs select-none hover:bg-[#ffe042] hover:text-black transition cursor-pointer"
                 >
-                  {copied ? "✓ কপি হয়েছে" : "লিঙ্ক কপি করুন"}
+                  {copied ? "✓ Copied" : "Copy Link"}
                 </button>
 
                 <div className="flex items-center bg-zinc-900 border border-white/5 p-0.5 rounded-lg">
@@ -1785,13 +1828,80 @@ export default function VideoPlayerModal({
               </div>
             </div>
 
+            {/* Star Rating Section */}
+            <div className="bg-[#121214] border border-white/5 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] font-mono text-slate-400 font-bold tracking-wider uppercase">User Rating</span>
+                  <div className="flex items-center gap-2.5 mt-1">
+                    <div className="text-3xl font-black text-white font-mono tracking-tight">
+                      {ratingStats.averageRating}
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const isFull = star <= Math.round(ratingStats.averageRating);
+                          return (
+                            <Star 
+                              key={`avg-star-${star}`} 
+                              className={`w-3.5 h-3.5 ${
+                                isFull ? "text-[#f5c518] fill-[#f5c518]" : "text-zinc-600 fill-zinc-800"
+                              }`} 
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                        {toBanglaNumber(ratingStats.totalRatings)} ratings
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center sm:items-end gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                  {ratingStats.userRating ? "Your Rating" : "Rate this video"}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const isSelected = star <= (hoverRating !== null ? hoverRating : (ratingStats.userRating || 0));
+                    return (
+                      <button
+                        key={`rate-star-${star}`}
+                        type="button"
+                        onClick={() => handleRatingClick(star)}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(null)}
+                        disabled={isSubmittingRating}
+                        className="group relative focus:outline-none cursor-pointer p-0.5"
+                      >
+                        <Star 
+                          className={`w-5.5 h-5.5 transition-all duration-200 transform group-hover:scale-125 ${
+                            isSelected 
+                              ? "text-[#f5c518] fill-[#f5c518] filter drop-shadow-[0_0_8px_rgba(245,197,24,0.5)]" 
+                              : "text-zinc-600 hover:text-zinc-400"
+                          } ${isSubmittingRating ? "opacity-50" : ""}`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                {ratingStats.userRating && (
+                  <span className="text-[9px] text-emerald-400 font-medium font-mono">
+                    Thanks for voting! (Rated {ratingStats.userRating}/5)
+                  </span>
+                )}
+              </div>
+            </div>
+
              {/* Responsive Sponsored Ad placements */}
             {adSettings.isEnabled && (
               <div className="w-full flex flex-col gap-4 mt-3 mb-3 transition-all" id="responsive-ad-banners-wrapper">
                 {/* Desktop Users banner: hidden md:block */}
                 <div className="hidden md:block w-full">
                   <div className="w-full flex flex-col items-center justify-center bg-zinc-900 rounded-xl p-3 border border-white/5 overflow-hidden shadow-sm animate-fade-in" id="banner-desktop-container">
-                    <span className="text-[9px] font-mono text-yellow-500 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS / স্পনসরড বিজ্ঞাপন</span>
+                    <span className="text-[9px] font-mono text-yellow-500 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS</span>
                     <div className="w-[728px] h-[90px] bg-white rounded-lg border border-zinc-200 shadow-inner flex items-center justify-center overflow-hidden">
                       <AdPlacement code={adSettings.preRollCode || adSettings.bannerVideoTopCode || adSettings.banner728x90Code || ""} type="728x90" />
                     </div>
@@ -1801,7 +1911,7 @@ export default function VideoPlayerModal({
                 {/* Mobile Users banner: block md:hidden */}
                 <div className="block md:hidden w-full">
                   <div className="w-full flex flex-col items-center justify-center bg-zinc-900 rounded-xl p-2.5 border border-white/5 overflow-hidden shadow-sm animate-fade-in" id="banner-mobile-container">
-                    <span className="text-[9px] font-mono text-yellow-400 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS / স্পনসরড বিজ্ঞাপন</span>
+                    <span className="text-[9px] font-mono text-yellow-400 font-extrabold mb-2.5 tracking-widest uppercase">SPONSORED LINKS</span>
                     <div className="bg-white rounded-lg border border-zinc-200 shadow-inner flex flex-col items-center justify-center max-w-full overflow-hidden shrink-0">
                       {adSettings.preRollCode || adSettings.bannerMobileBottomCode || adSettings.banner320x50Code ? (
                         <div className="w-[320px] h-[50px] overflow-hidden flex items-center justify-center">
@@ -1827,10 +1937,10 @@ export default function VideoPlayerModal({
               </div>
             </div>
 
-            {/* Related Videos: "সম্পর্কিত ভিডিও" in 2-column mobile / 4-column desktop layout */}
+            {/* Related Videos */}
             <div className="mt-6 flex flex-col gap-4 text-left" id="related-videos-section">
               <h3 className="text-sm font-bold tracking-wider text-[#f5c518] uppercase flex items-center gap-2 border-b border-white/5 pb-2.5">
-                <span>সম্পর্কিত ভিডিও (Related Videos)</span>
+                <span>Related Videos</span>
                 <span className="text-[10px] bg-yellow-400/10 text-[#f5c518] px-2 py-0.5 rounded font-mono font-bold">
                   {toBanglaNumber(relatedVideos.length)}
                 </span>
@@ -1838,7 +1948,7 @@ export default function VideoPlayerModal({
 
               {relatedVideos.length === 0 ? (
                 <div className="text-zinc-500 font-mono text-[11px] py-12 text-center bg-[#111] rounded-xl border border-dashed border-white/5">
-                  কোনো সম্পর্কিত ভিডিও পাওয়া যায়নি।
+                  No related videos found.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1884,14 +1994,14 @@ export default function VideoPlayerModal({
             <div className="mt-8 flex flex-col gap-5 text-left border-t border-white/5 pt-6" id="comments-section">
               <h3 className="text-sm font-bold tracking-wider text-[#f5c518] uppercase flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
-                <span>মন্তব্যসমূহ ({toBanglaNumber(comments.filter(c => c.isApproved || isAdmin).length)})</span>
+                <span>Comments ({toBanglaNumber(comments.filter(c => c.isApproved || isAdmin).length)})</span>
               </h3>
 
               {/* Comment submitted notice */}
               {showCommentSuccess && (
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl flex items-center gap-2 animate-fade-in">
                   <Check className="w-4 h-4 shrink-0" />
-                  <span>আপনার মন্তব্য সফলভাবে জমা হয়েছে এবং এটি অচিরেই অ্যাডমিন কর্তৃক অনুমোদিত হলে সবার কাছে প্রদর্শিত হবে।</span>
+                  <span>Your comment was submitted successfully! It will appear publicly after approval.</span>
                 </div>
               )}
 
@@ -1900,7 +2010,7 @@ export default function VideoPlayerModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     type="text"
-                    placeholder="আপনার নাম লিখুন..."
+                    placeholder="Enter your name..."
                     value={commentName}
                     onChange={(e) => setCommentName(e.target.value)}
                     className="bg-black/40 border border-white/5 focus:border-[#f5c518] rounded-xl px-4 py-2 text-xs text-white outline-none transition"
@@ -1908,7 +2018,7 @@ export default function VideoPlayerModal({
                   />
                 </div>
                 <textarea
-                  placeholder="আপনার মন্তব্যটি এখানে লিখুন..."
+                  placeholder="Write your comment here..."
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   rows={3}
@@ -1922,7 +2032,7 @@ export default function VideoPlayerModal({
                   className="self-end flex items-center gap-1.5 px-4.5 py-2 rounded-xl bg-[#f5c518] hover:bg-yellow-450 text-black text-xs font-bold transition duration-150 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>পোস্ট করুন (Post Comment)</span>
+                  <span>Post Comment</span>
                 </button>
               </form>
 
@@ -1930,7 +2040,7 @@ export default function VideoPlayerModal({
               <div className="space-y-4">
                 {comments.filter(c => c.isApproved || isAdmin).length === 0 ? (
                   <p className="text-zinc-500 text-xs py-5 text-center bg-[#111] rounded-xl border border-dashed border-white/5">
-                    এখনো কোনো মন্তব্য নেই। প্রথম মন্তব্যটি আপনিই করুন!
+                    No comments yet. Be the first to share your thoughts!
                   </p>
                 ) : (
                   comments
@@ -1981,6 +2091,21 @@ export default function VideoPlayerModal({
                             >
                               <Flag className="w-3.5 h-3.5" />
                             </button>
+
+                            {isAdmin && (
+                              <button
+                                onClick={async () => {
+                                  if (confirm("Are you sure you want to delete this comment?")) {
+                                    await deleteComment(comm.id, video.id);
+                                    loadComments();
+                                  }
+                                }}
+                                className="text-red-500 hover:text-red-450 transition p-1 cursor-pointer"
+                                title="Delete Comment"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -2013,7 +2138,7 @@ export default function VideoPlayerModal({
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <input
                                   type="text"
-                                  placeholder="উত্তরদাতার নাম..."
+                                  placeholder="Respondent's name..."
                                   value={replyName}
                                   onChange={(e) => setReplyName(e.target.value)}
                                   className="bg-[#121214] border border-white/5 focus:border-[#f5c518] rounded-lg px-3 py-1.5 text-[11px] text-white outline-none"
@@ -2021,7 +2146,7 @@ export default function VideoPlayerModal({
                                 />
                               </div>
                               <textarea
-                                placeholder="আপনার উত্তরটি লিখুন..."
+                                placeholder="Write your reply..."
                                 value={replyText}
                                 onChange={(e) => setReplyText(e.target.value)}
                                 rows={2}
@@ -2034,14 +2159,14 @@ export default function VideoPlayerModal({
                                   onClick={() => setReplyingToCommentId(null)}
                                   className="px-3 py-1 rounded-lg text-slate-400 hover:text-white text-[10px] font-bold cursor-pointer"
                                 >
-                                  বন্ধ করুন
+                                  Cancel
                                 </button>
                                 <button
                                   type="submit"
                                   disabled={isSubmittingReply}
                                   className="px-4 py-1.5 rounded-lg bg-[#f5c518] hover:bg-yellow-450 text-black text-[10px] font-bold cursor-pointer"
                                 >
-                                  উত্তর দিন
+                                  Reply
                                 </button>
                               </div>
                             </form>
@@ -2054,7 +2179,7 @@ export default function VideoPlayerModal({
                               }}
                               className="text-[10px] font-semibold text-yellow-500 hover:text-yellow-400 hover:underline cursor-pointer"
                             >
-                              উত্তর দিন (Reply)
+                              Reply
                             </button>
                           )}
                         </div>
@@ -2077,7 +2202,7 @@ export default function VideoPlayerModal({
           <div className="bg-[#111113] border border-white/5 rounded-2xl p-4 flex flex-col gap-3.5 text-left" id="popular-this-week-sidebar">
             <h3 className="text-xs font-black tracking-widest text-[#f5c518] uppercase font-mono border-b border-white/5 pb-2.5 flex items-center gap-1.5">
               <Flame className="w-3.5 h-3.5 text-yellow-400" />
-              <span>শীর্ষ ৫ ভিডিও (Popular This Week)</span>
+              <span>Trending This Week</span>
             </h3>
 
             <div className="flex flex-col gap-3">

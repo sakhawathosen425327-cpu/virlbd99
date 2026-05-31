@@ -82,6 +82,7 @@ export default function AdsController({
   const [bannerVideoUnderPlayerEnabled, setBannerVideoUnderPlayerEnabled] = useState(adSettings.bannerVideoUnderPlayerEnabled || false);
   const [bannerSidebarEnabled, setBannerSidebarEnabled] = useState(adSettings.bannerSidebarEnabled || false);
   const [bannerMobileBottomEnabled, setBannerMobileBottomEnabled] = useState(adSettings.bannerMobileBottomEnabled || false);
+  const [bannerSocialEnabled, setBannerSocialEnabled] = useState(adSettings.bannerSocialEnabled !== false);
 
   // Banners code variables
   const [banner320x50Code, setBanner320x50Code] = useState(adSettings.banner320x50Code || "");
@@ -93,6 +94,7 @@ export default function AdsController({
   const [bannerVideoUnderPlayerCode, setBannerVideoUnderPlayerCode] = useState(adSettings.bannerVideoUnderPlayerCode || "");
   const [bannerSidebarCode, setBannerSidebarCode] = useState(adSettings.bannerSidebarCode || "");
   const [bannerMobileBottomCode, setBannerMobileBottomCode] = useState(adSettings.bannerMobileBottomCode || "");
+  const [bannerSocialCode, setBannerSocialCode] = useState(adSettings.bannerSocialCode || "");
 
   // Popunder safety configs legacy fallback
   const [popunderClickFrequency, setPopunderClickFrequency] = useState(adSettings.popunderClickFrequency || 2);
@@ -138,6 +140,7 @@ export default function AdsController({
     setBannerVideoUnderPlayerEnabled(adSettings.bannerVideoUnderPlayerEnabled || false);
     setBannerSidebarEnabled(adSettings.bannerSidebarEnabled || false);
     setBannerMobileBottomEnabled(adSettings.bannerMobileBottomEnabled || false);
+    setBannerSocialEnabled(adSettings.bannerSocialEnabled !== false);
 
     setBanner320x50Code(adSettings.banner320x50Code || "");
     setBanner300x250Code(adSettings.banner300x250Code || "");
@@ -148,6 +151,7 @@ export default function AdsController({
     setBannerVideoUnderPlayerCode(adSettings.bannerVideoUnderPlayerCode || "");
     setBannerSidebarCode(adSettings.bannerSidebarCode || "");
     setBannerMobileBottomCode(adSettings.bannerMobileBottomCode || "");
+    setBannerSocialCode(adSettings.bannerSocialCode || "");
 
     setPopunderClickFrequency(adSettings.popunderClickFrequency || 2);
     setPopunderDelaySeconds(adSettings.popunderDelaySeconds || 0);
@@ -214,6 +218,7 @@ export default function AdsController({
         bannerVideoUnderPlayerEnabled,
         bannerSidebarEnabled,
         bannerMobileBottomEnabled,
+        bannerSocialEnabled,
 
         // General banner codes
         banner320x50Code,
@@ -225,6 +230,7 @@ export default function AdsController({
         bannerVideoUnderPlayerCode,
         bannerSidebarCode,
         bannerMobileBottomCode,
+        bannerSocialCode,
 
         // Safety limiters
         popunderClickFrequency: Number(popunderClickFrequency),
@@ -333,16 +339,16 @@ export default function AdsController({
             <div className="bg-[#121212] border border-white/5 rounded-2xl p-5 shadow-xl space-y-4">
               <h3 className="text-xs font-bold font-mono text-yellow-400 uppercase tracking-wider border-b border-white/5 pb-2 flex items-center gap-1.5">
                 <Sliders className="w-4 h-4" />
-                মাস্টার কন্ট্রোল ও রেট ম্যানিপুলেশন (Global Config)
+                Global Control & Rate Manipulation (Global Config)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Enabled Toggle Switch */}
                 <div className="flex items-center justify-between p-3.5 bg-[#161618] rounded-xl border border-white/5">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-200">সার্বজনীন বিজ্ঞাপন সক্ষমতা (Master On/Off)</h4>
+                    <h4 className="text-xs font-bold text-slate-200">Global Ad Delivery Switch (Master On/Off)</h4>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-normal">
-                      একটি ক্লিকে অল প্ল্যাটফর্ম অ্যাডস সোর্স বন্ধ বা চালু করুন।
+                      Enable or disable all platform advertising sources globally with a single click.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -395,7 +401,7 @@ export default function AdsController({
               {/* Public Community URLs */}
               <div className="pt-2 border-t border-white/5 space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                  পাবলিক কমিউনিটি চ্যানেল লিঙ্ক সেটিংস (Channels Link)
+                  Public Community Channels Links (Channels Links)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
@@ -437,10 +443,10 @@ export default function AdsController({
               <div className="border-b border-white/5 pb-2">
                 <h3 className="text-xs font-bold font-mono text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Code className="w-4 h-4 text-[#f5c518]" />
-                  সরাসরি বিজ্ঞাপন স্ক্রিপ্ট সেটিংস ও অনলাইন টগলস (Direct Ad Units Config)
+                  Direct Ad Scripts Settings & Online Toggles (Direct Ad Units Config)
                 </h3>
                 <p className="text-[10.5px] text-slate-400 mt-1">
-                  এখানে বিজ্ঞাপন কোড বসিয়ে সরাসরি টগল বাটন দিয়ে কন্ট্রোল করুন। ক্লায়েন্ট সাইট কোনো স্ক্রিপ্ট মুছবে না।
+                  Insert your ad tags/scripts here and control active delivery via high-priority overrides.
                 </p>
               </div>
 
@@ -452,9 +458,9 @@ export default function AdsController({
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         <Code className="w-3.5 h-3.5 text-purple-400" />
-                        পপআন্ডার বিজ্ঞাপন কোড (Popunder Script Code)
+                        Popunder Advertising Code (Popunder Script Code)
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">রিল ও হোম পেইজ ক্লিকপয়েন্ট ইন্টারেকশন পপআন্ডার স্ক্রিপ্ট।</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Launches ad networks on page interactions or clip click-throughs.</p>
                     </div>
                     {/* Safe Toggle next to Textarea Header */}
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -471,7 +477,7 @@ export default function AdsController({
                     rows={4}
                     value={popunderCode}
                     onChange={(e) => setPopunderCode(e.target.value)}
-                    placeholder="পপআন্ডার স্ক্রিপ্ট পেস্ট করুন যেমন: <script type='text/javascript'>...</script>"
+                    placeholder="Paste popunder script e.g. <script type='text/javascript'>...</script>"
                     className="w-full bg-black/40 border border-white/5 rounded-lg p-3 text-xs font-mono text-purple-300 placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -482,9 +488,9 @@ export default function AdsController({
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         <Tv className="w-3.5 h-3.5 text-amber-500" />
-                        ভিডিও প্লেয়ার প্রি-রোল বিজ্ঞাপন কোড (Video Pre-roll Ad Script)
+                        Video Player Pre-roll Ad Script (Video Pre-roll Ad Script)
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">ভিডিও চালু করার সাথে সাথে প্রদর্শিত ওভারলে প্রি-রোল বিজ্ঞাপন।</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Displays a rich HTML pre-roll advertisement unit overlay before playback starts.</p>
                     </div>
                     {/* Safe Toggle next to Textarea Header */}
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -501,7 +507,7 @@ export default function AdsController({
                   {/* Inline Helper Config Parameters for Pre-roll to preserve functionality */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-1 border-b border-white/5 mb-1 text-xs">
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase text-left">Skip Timer Seconds (সেকেন্ড)</span>
+                      <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase text-left">Skip Timer Seconds</span>
                       <input
                         type="number"
                         min="1"
@@ -512,7 +518,7 @@ export default function AdsController({
                       />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase text-left">Ad Click Action URL (লিঙ্ক)</span>
+                      <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase text-left">Ad Click Action URL (Link)</span>
                       <input
                         type="url"
                         value={preRollClickUrl}
@@ -527,7 +533,7 @@ export default function AdsController({
                     rows={4}
                     value={preRollCode}
                     onChange={(e) => setPreRollCode(e.target.value)}
-                    placeholder="ভিডিও প্রি-রোল রিচ HTML কোড এখানে পেস্ট করুন..."
+                    placeholder="Paste rich HTML/pre-roll source tags here..."
                     className="w-full bg-black/40 border border-white/5 rounded-lg p-3 text-xs font-mono text-amber-200 placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-yellow-400"
                   />
                 </div>
@@ -538,9 +544,9 @@ export default function AdsController({
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         <Layout className="w-3.5 h-3.5 text-emerald-400" />
-                        সোশ্যাল বার স্ক্রিপ্ট কোড (Social Bar Ad Script)
+                        Social Bar Script Code (Social Bar Ad Script)
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">ইন-পৃষ্ঠা স্মার্ট চ্যাট নোটিফিকেশন অথবা সোশ্যাল ফ্লোটিং বিজ্ঞাপন।</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Renders on-screen floating notification cards, widget highlights, or dynamic chat ads.</p>
                     </div>
                     {/* Safe Toggle next to Textarea Header */}
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -556,14 +562,14 @@ export default function AdsController({
 
                   {/* Inline Float placement field so it is editable */}
                   <div className="flex flex-col pl-1">
-                    <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase">ফ্লোটিং পজিশন (Float position placement)</span>
+                    <span className="text-[10px] text-slate-400 font-mono mb-1 uppercase">Floating Placement (Float position)</span>
                     <select
                       value={socialBarPosition}
                       onChange={(e) => setSocialBarPosition(e.target.value)}
                       className="bg-black/30 border border-white/5 text-white text-xs p-1.5 rounded focus:outline-none w-full sm:w-1/2"
                     >
-                      <option value="bottom">Screen Bottom Float (নিচে - রিকমেন্ডেড)</option>
-                      <option value="top">Screen Top Flat Banner (উপরে)</option>
+                      <option value="bottom">Screen Bottom Float (Recommended)</option>
+                      <option value="top">Screen Top Flat Banner</option>
                     </select>
                   </div>
 
@@ -571,7 +577,7 @@ export default function AdsController({
                     rows={4}
                     value={socialBarCode}
                     onChange={(e) => setSocialBarCode(e.target.value)}
-                    placeholder="সোশ্যাল বার স্ক্রিপ্ট বা স্মার্ট নোটিফিকেশন কোড এখানে পেস্ট করুন..."
+                    placeholder="Paste social bar/smart interaction script code..."
                     className="w-full bg-black/40 border border-white/5 rounded-lg p-3 text-xs font-mono text-emerald-300 placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
@@ -582,9 +588,9 @@ export default function AdsController({
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-                        ব্যানার অ্যাড হোমপেজ উপরে (Banner Ad - Homepage Top 728x90)
+                        Banner Ad - Homepage Top (728x90 Billboard)
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">হোমপেজের একদম উপরে বড় লিডারবোর্ড ফরম্যাট ব্যানার স্ক্রিপ্ট।</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Standard leaderboard banner displayed prominently above header region.</p>
                     </div>
                     {/* Safe Toggle next to Textarea Header */}
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -601,7 +607,7 @@ export default function AdsController({
                     rows={3}
                     value={bannerHomeTopCode}
                     onChange={(e) => setBannerHomeTopCode(e.target.value)}
-                    placeholder="হোমপেজ উপরে লিডারবোর্ড HTML/JS স্ক্রিপ্ট এখানে পেস্ট করুন..."
+                    placeholder="Paste billboard HTML/JS ad tags here..."
                     className="w-full bg-black/40 border border-white/5 rounded-lg p-3 text-xs font-mono text-indigo-300 placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
@@ -612,9 +618,9 @@ export default function AdsController({
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         <Layout className="w-3.5 h-3.5 text-blue-400" />
-                        ব্যানার অ্যাড প্লেয়ারের নিচে (Banner Ad - Below Player 300x250)
+                        Banner Ad - Below Player (300x250 Medium Rectangle)
                       </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">ভিডিও দেখতে দেখতে প্লেয়ার স্ক্রিনের নিচে প্রদর্শিত ব্যানার স্ক্রিপ্ট।</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Highly viewable square banner displayed immediately below the active play theater.</p>
                     </div>
                     {/* Safe Toggle next to Textarea Header */}
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -631,7 +637,7 @@ export default function AdsController({
                     rows={3}
                     value={bannerVideoUnderPlayerCode}
                     onChange={(e) => setBannerVideoUnderPlayerCode(e.target.value)}
-                    placeholder="প্লেয়ারের নিচের ব্যানার কোড 300x250 HTML/JS স্ক্রিপ্ট পেস্ট করুন..."
+                    placeholder="Paste 300x250 banner code segments here..."
                     className="w-full bg-black/40 border border-white/5 rounded-lg p-3 text-xs font-mono text-blue-300 placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -649,10 +655,10 @@ export default function AdsController({
                 <div>
                   <h4 className="text-xs font-bold font-mono text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                     <Sliders className="w-4 h-4 text-emerald-400" />
-                    অন্যান্য উন্নত বিজ্ঞাপন সেটিংস (Advanced Configurations)
+                    Advanced Ad Inventory Controls (Advanced Configurations)
                   </h4>
                   <p className="text-[9.5px] text-slate-500 mt-0.5 leading-normal">
-                    ডিরেক্ট রিডাইরেক্ট স্মার্টলিঙ্ক, সাইডবার ও মোবাইল বটম ব্যানার কোড ম্যানিপুলেশন সেটিংস।
+                    Manage direct redirections, sidebars, social banners, and specialized mobile footers.
                   </p>
                 </div>
                 <span className="text-slate-400">
@@ -667,8 +673,8 @@ export default function AdsController({
                   <div className="p-4 bg-[#161618] rounded-xl border border-white/5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-200">ডিরেক্ট লিঙ্ক সেটিং (Direct Smart Link Configuration)</h4>
-                        <p className="text-[10px] text-slate-500 mt-0.5">সাইট ক্লিকপয়েন্ট নোউ-আইডি ডিরেক্ট লিঙ্ক সোর্স ব্যানার।</p>
+                        <h4 className="text-xs font-bold text-slate-200">Direct Link Setting (Direct Smart Link Configuration)</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Redirect triggers or dynamic smart links on click interactions.</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer shrink-0">
                         <input 
@@ -693,7 +699,7 @@ export default function AdsController({
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-slate-400 font-mono block">Cooldown Interval Minutes (ফ্রিকোয়েন্সি)</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">Cooldown Interval Minutes (Frequency)</span>
                         <input
                           type="number"
                           min="1"
@@ -709,12 +715,12 @@ export default function AdsController({
                   {/* Popunder limiters configurations */}
                   <div className="p-4 bg-[#161618] rounded-xl border border-white/5 space-y-3">
                     <div className="border-b border-white/5 pb-1">
-                      <h4 className="text-xs font-bold text-slate-200">পপআন্ডার সেফটি ফ্রিকোয়েন্সি (Popunder Safety Controls)</h4>
-                      <p className="text-[9.5px] text-slate-500 mt-0.5">অতিরিক্ত স্ক্রিপ্ট লোড বন্ধ করতে এবং ইউজার রিটেনশন বাড়াতে ফ্রিকোয়েন্সি সীমা স্থাপন করুন।</p>
+                      <h4 className="text-xs font-bold text-slate-200">Popunder Safety Controls</h4>
+                      <p className="text-[9.5px] text-slate-500 mt-0.5">Set frequency limits to prevent intrusive script loops and enhance visitor retention.</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
                       <div className="space-y-1">
-                        <span className="text-[9px] text-[#f5c518] block font-bold">CLICK FREQUENCY (ক্লিকে কতবার)</span>
+                        <span className="text-[9px] text-[#f5c518] block font-bold">CLICK FREQUENCY (No. of clicks)</span>
                         <input
                           type="number"
                           min="1"
@@ -725,7 +731,7 @@ export default function AdsController({
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[9px] text-[#f5c518] block font-bold font-mono">DELAY SECONDS (বিলম্ব সেকেন্ড)</span>
+                        <span className="text-[9px] text-[#f5c518] block font-bold font-mono">DELAY SECONDS (Wait seconds)</span>
                         <input
                           type="number"
                           min="0"
@@ -736,7 +742,7 @@ export default function AdsController({
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[9px] text-[#f5c518] block font-bold">COOLDOWN MINUTES (পুনঃলোডের মিনিট)</span>
+                        <span className="text-[9px] text-[#f5c518] block font-bold">COOLDOWN MINUTES (Cooldown duration)</span>
                         <input
                           type="number"
                           min="1"
@@ -752,15 +758,15 @@ export default function AdsController({
                   {/* Secondary optional placement slots */}
                   <div className="p-4 bg-[#161618] rounded-xl border border-white/5 space-y-3">
                     <h4 className="text-xs font-bold text-slate-300 border-b border-white/5 pb-1.5 flex items-center justify-between">
-                      <span>ঐচ্ছিক ব্যানার স্লটস (Optional Generic Banners)</span>
-                      <span className="text-[9px] text-slate-500">প্রয়োজনে এগুলো ব্যবহার করা যাবে</span>
+                      <span>Optional Generic Banner Slots</span>
+                      <span className="text-[9px] text-slate-500">Deploy as needed for extra revenue</span>
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Banner Left Sidebar */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400">সাইডবার ব্যানার (Sidebar 300x250)</span>
+                          <span className="text-[10px] font-bold text-slate-400">Sidebar Banner (Sidebar 300x250)</span>
                           <label className="relative inline-flex items-center cursor-pointer shrink-0">
                             <input type="checkbox" checked={bannerSidebarEnabled} onChange={(e) => setBannerSidebarEnabled(e.target.checked)} className="sr-only peer"/>
                             <div className="w-7 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -778,7 +784,7 @@ export default function AdsController({
                       {/* Homepage Middle Banner */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400">হোমপেজ মাঝখানে (Home Native 300x250)</span>
+                          <span className="text-[10px] font-bold text-slate-400">Homepage Native Ad (Home Native 300x250)</span>
                           <label className="relative inline-flex items-center cursor-pointer shrink-0">
                             <input type="checkbox" checked={bannerHomeMiddleEnabled} onChange={(e) => setBannerHomeMiddleEnabled(e.target.checked)} className="sr-only peer"/>
                             <div className="w-7 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -796,7 +802,7 @@ export default function AdsController({
                       {/* Video View Top Banner */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400">ভিডিও টাইটেল এর উপরে (Video Top 728x90)</span>
+                          <span className="text-[10px] font-bold text-slate-400">Above Video Title Tag (Video Top 728x90)</span>
                           <label className="relative inline-flex items-center cursor-pointer shrink-0">
                             <input type="checkbox" checked={bannerVideoTopEnabled} onChange={(e) => setBannerVideoTopEnabled(e.target.checked)} className="sr-only peer"/>
                             <div className="w-7 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -814,7 +820,7 @@ export default function AdsController({
                       {/* Sticky Mobile Banner */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400">মোবাইল স্টিকি বটম (Mobile Footer 320x50)</span>
+                          <span className="text-[10px] font-bold text-slate-400">Sticky Mobile Bottom (Mobile Footer 320x50)</span>
                           <label className="relative inline-flex items-center cursor-pointer shrink-0">
                             <input type="checkbox" checked={bannerMobileBottomEnabled} onChange={(e) => setBannerMobileBottomEnabled(e.target.checked)} className="sr-only peer"/>
                             <div className="w-7 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -828,6 +834,24 @@ export default function AdsController({
                             setBanner320x50Code(e.target.value); // Sync variables safely
                           }}
                           placeholder="Sticky footer script..."
+                          className="w-full bg-black/40 border border-white/5 rounded p-1.5 text-[10px] font-mono text-zinc-300"
+                        />
+                      </div>
+
+                      {/* Community Social Banner */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400">Community Channel Banner (Community Social Banner 320x50 / 728x90)</span>
+                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" checked={bannerSocialEnabled} onChange={(e) => setBannerSocialEnabled(e.target.checked)} className="sr-only peer"/>
+                            <div className="w-7 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                          </label>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={bannerSocialCode}
+                          onChange={(e) => setBannerSocialCode(e.target.value)}
+                          placeholder="Social channels banner advertising script..."
                           className="w-full bg-black/40 border border-white/5 rounded p-1.5 text-[10px] font-mono text-zinc-300"
                         />
                       </div>
@@ -846,7 +870,7 @@ export default function AdsController({
                 className="flex items-center gap-1 px-4 py-3 bg-[#1e1e20] border border-white/5 hover:bg-zinc-800 text-[10px] font-mono text-yellow-400 font-bold rounded-xl active:scale-95 transition cursor-pointer"
               >
                 <Layers className="w-3.5 h-3.5 animate-pulse" />
-                <span>বিজ্ঞাপন টেস্ট রিডਾਈরেক্ট (Redirection Simulator)</span>
+                <span>Simulate Direct Link Redirection</span>
               </button>
 
               <button
@@ -855,7 +879,7 @@ export default function AdsController({
                 className="flex-grow flex items-center justify-center gap-1.5 px-6 py-3 bg-gradient-to-r from-yellow-400 to-amber-500 text-black text-xs font-black rounded-xl cursor-pointer hover:brightness-110 active:scale-95 transition tracking-wider uppercase"
               >
                 <Check className="w-4 h-4" />
-                <span>{submitting ? "সংরক্ষন করা হচ্ছে..." : "বিজ্ঞাপন সেটিংস সংরক্ষণ করুন (Save Configuration)"}</span>
+                <span>{submitting ? "Saving Configuration..." : "Save Ad Settings Configuration"}</span>
               </button>
             </div>
 
@@ -875,7 +899,7 @@ export default function AdsController({
 
             <h3 className="text-white font-bold font-display text-base">Direct Link Redirecting...</h3>
             <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-              সিস্টেম ডিরেক্ট রিডাইরেক্ট লিঙ্ক সাকসেসফুলি রান করেছে! আপনার বিজ্ঞাপনটি নিম্নোক্ত ল্যান্ডিং পেইজে প্লে করা হবে।
+              Direct smart link redirect has been generated successfully! It will send visitors to the following offer wall page.
             </p>
 
             <div className="mt-4 p-2 bg-slate-950 rounded border border-white/5 font-mono text-[10px] text-slate-400 text-left truncate">
@@ -891,7 +915,7 @@ export default function AdsController({
               }}
               className="mt-5 w-full bg-[#f5c518] hover:bg-[#ffe042] text-black py-2.5 rounded-xl text-xs font-bold cursor-pointer transition select-none text-shadow flex items-center justify-center gap-1"
             >
-              আজকের ডিরেক্ট লিঙ্ক টেস্ট + ও প্লে করুন
+              Simulate and Visit Direct Link Now
             </button>
           </div>
         </div>
