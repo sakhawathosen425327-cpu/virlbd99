@@ -315,23 +315,21 @@ export async function getVideos(): Promise<Video[]> {
       snap.forEach((docSnap) => {
         list.push(docSnap.data() as Video);
       });
-      if (list.length > 0) {
-        // Dynamically sort videos: newest first
-        list.sort((a, b) => {
-          const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
-          const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
-          return (dateB as any) - (dateA as any);
-        });
-        // Sync back to local storage for instant offline retrieval
-        setLocalStorageData("cineflex_v2_videos", list);
-        return list;
-      }
+      // Dynamically sort videos: newest first
+      list.sort((a, b) => {
+        const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+        const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+        return (dateB as any) - (dateA as any);
+      });
+      // Sync back to local storage for instant offline retrieval
+      setLocalStorageData("cineflex_v2_videos", list);
+      return list;
     } catch (e) {
       console.warn("Firestore fetch videos failed. Falling back to LocalStorage.", e);
       checkQuotaError(e);
     }
   }
-  const localList = getLocalStorageData<Video[]>("cineflex_v2_videos", DEFAULT_VIDEOS);
+  const localList = getLocalStorageData<Video[]>("cineflex_v2_videos", []);
   localList.sort((a, b) => {
     const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
     const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);

@@ -231,7 +231,7 @@ export default function VideoGrid({
   if (videos.length === 0) {
     return (
       <div className="w-full py-16 text-center text-[#aaaaaa] text-xs font-mono" id="empty-videos-notice">
-        No videos found.
+        কোনো ভিডিও পাওয়া যায়নি
       </div>
     );
   }

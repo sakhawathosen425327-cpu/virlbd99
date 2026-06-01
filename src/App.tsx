@@ -1421,7 +1421,7 @@ export default function App() {
             ))}
 
             {/* 4. TRENDING ROW */}
-            {!searchQuery && (
+            {!searchQuery && videos.length > 0 && (
               <div className="px-4 max-w-7xl mx-auto w-full text-left" id="home-trending-carousel-container">
                 <div className="border-l-4 border-[#f5c518] pl-2.5 mb-3">
                   <h3 className="text-sm font-black uppercase text-white font-sans tracking-wide">
