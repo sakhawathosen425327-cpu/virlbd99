@@ -1,7 +1,20 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import {defineConfig} from 'vite';
+
+// Dynamically construct a distinct version string on each build
+const getBuildVersion = () => {
+  try {
+    const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
+    return `${packageJson.version || '0.0.0'}-${Date.now()}`;
+  } catch (err) {
+    return `0.0.0-${Date.now()}`;
+  }
+};
+
+const buildVersion = getBuildVersion();
 
 export default defineConfig(() => {
   return {
@@ -10,6 +23,15 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          entryFileNames: `assets/[name]-[hash]-v${buildVersion}.js`,
+          chunkFileNames: `assets/[name]-[hash]-v${buildVersion}.js`,
+          assetFileNames: `assets/[name]-[hash]-v${buildVersion}.[ext]`,
+        },
       },
     },
     server: {

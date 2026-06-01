@@ -182,6 +182,11 @@ export default function App() {
   // Dynamic system toast representation
   const [showToast, setShowToast] = useState<string | null>(null);
 
+  // Maintenance mode custom login panel states
+  const [showMaintPassField, setShowMaintPassField] = useState(false);
+  const [maintPassword, setMaintPassword] = useState("");
+  const [maintError, setMaintError] = useState("");
+
   // App initialization loaders
   const [loading, setLoading] = useState(true);
 
@@ -816,6 +821,16 @@ export default function App() {
         sessionStorage.setItem("viralbd99_session_active", "true");
         setIsLoggedIn(true);
         setIsAdminMode(true);
+        
+        // Turn off maintenance mode and redirect to admin panel
+        const updatedSettings = {
+          ...siteSettings,
+          maintenanceMode: false
+        };
+        await updateSiteSettings(updatedSettings);
+        setSiteSettings(updatedSettings);
+        setCurrentTab(ViewTab.ADMIN);
+
         await addActivityLog("Login", "Admin bypassed maintenance mode screen via system password.");
         setShowToast("Bypass Successful. Welcome, Admin!");
         setTimeout(() => setShowToast(null), 3000);
@@ -824,6 +839,49 @@ export default function App() {
       }
     } catch (e) {
       alert("Authentication error!");
+    }
+  };
+
+  const handleMaintPassSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maintPassword.trim()) {
+      setMaintError("Wrong password");
+      return;
+    }
+    try {
+      const securityDoc = await getAdminSecurity();
+      if (maintPassword.trim() === securityDoc.password) {
+        const randToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionObj = {
+          token: randToken,
+          expiresAt: Date.now() + 1 * 60 * 60 * 1000
+        };
+        localStorage.setItem("viralbd99_admin_session", JSON.stringify(sessionObj));
+        sessionStorage.setItem("viralbd99_session_active", "true");
+        setIsLoggedIn(true);
+        setIsAdminMode(true);
+        
+        // Turn off maintenance mode and redirect to admin panel
+        const updatedSettings = {
+          ...siteSettings,
+          maintenanceMode: false
+        };
+        await updateSiteSettings(updatedSettings);
+        setSiteSettings(updatedSettings);
+        setCurrentTab(ViewTab.ADMIN);
+
+        await addActivityLog("Login", "Admin bypassed maintenance mode screen and turned it off.");
+        setShowToast("Bypass Successful. Welcome, Admin!");
+        setTimeout(() => setShowToast(null), 3000);
+        
+        setShowMaintPassField(false);
+        setMaintPassword("");
+        setMaintError("");
+      } else {
+        setMaintError("Wrong password");
+      }
+    } catch (err) {
+      setMaintError("Authentication error!");
     }
   };
 
@@ -1073,17 +1131,55 @@ export default function App() {
             <span className="text-[10px] font-mono text-slate-400">
               Are you an Administrator?
             </span>
-            <button
-              onClick={() => {
-                const pass = window.prompt("Enter Administrator Password:");
-                if (pass) {
-                  handleMaintenanceBypass(pass);
-                }
-              }}
-              className="px-4 py-2 bg-[#1a1a24] hover:bg-[#202030] border border-white/5 hover:border-white/10 rounded-xl text-[10px] text-slate-300 hover:text-white font-mono font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
-            >
-              Sign In To System Panel
-            </button>
+            {!showMaintPassField ? (
+              <button
+                onClick={() => {
+                  setShowMaintPassField(true);
+                  setMaintError("");
+                }}
+                className="px-4 py-2 bg-[#1a1a24] hover:bg-[#202030] border border-white/5 hover:border-white/10 rounded-xl text-[10px] text-slate-300 hover:text-white font-mono font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+              >
+                Sign In To System Panel
+              </button>
+            ) : (
+              <form onSubmit={handleMaintPassSubmit} className="w-full flex flex-col gap-3 max-w-[280px]">
+                <input
+                  type="password"
+                  placeholder="Enter Password"
+                  value={maintPassword}
+                  onChange={(e) => {
+                    setMaintPassword(e.target.value);
+                    setMaintError("");
+                  }}
+                  className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#f5c518] text-center font-mono"
+                  autoFocus
+                />
+                {maintError && (
+                  <p className="text-[10px] text-red-500 font-mono font-bold uppercase tracking-wider">
+                    {maintError}
+                  </p>
+                )}
+                <div className="flex gap-2 w-full">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-[#f5c518] hover:bg-[#ffe042] text-black rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+                  >
+                    Login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMaintPassField(false);
+                      setMaintPassword("");
+                      setMaintError("");
+                    }}
+                    className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>

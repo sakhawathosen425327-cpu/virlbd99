@@ -25,10 +25,10 @@ import { Video, Category, AdSettings, AdminSecurity, ActivityLog, DailyAdStats, 
 import { getDatabase, ref as rtdbRef, onValue as onRtdbValue, set as setRtdb, onDisconnect as onRtdbDisconnect, runTransaction as rtdbRunTransaction } from "firebase/database";
 import firebaseConfig from "../../firebase-applet-config.json";
 
-let rtdb: any = null;
+export let rtdb: any = null;
 
 // Dynamic configuration check to protect against missing credentials or bootstrap placeholders
-const isFirebaseConfigured = 
+export const isFirebaseConfigured = 
   firebaseConfig && 
   firebaseConfig.apiKey && 
   firebaseConfig.apiKey !== "MISSING" && 
@@ -439,19 +439,27 @@ export async function addCategory(category: Category): Promise<void> {
 }
 
 export async function getAdSettings(): Promise<AdSettings> {
-  const path = "adSettings/global";
+  const adDocRef = doc(db, "adSettings", "global");
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {
-      const snap = await getDocs(collection(db, "adSettings"));
-      let found: AdSettings | null = null;
-      snap.forEach((docSnap) => {
-        if (docSnap.id === "global") {
-          found = docSnap.data() as AdSettings;
-        }
-      });
-      if (found) {
+      const snap = await getDoc(adDocRef);
+      if (snap.exists()) {
+        const found = snap.data() as AdSettings;
         setLocalStorageData("cineflex_v2_ad_settings", found);
         return found;
+      } else {
+        // Bi-directional safety sync: Check if we have settings in LocalStorage first
+        const localData = getLocalStorageData<AdSettings | null>("cineflex_v2_ad_settings", null);
+        if (localData && localData.id === "global") {
+          // Upload local data to Firestore so we don't lose it!
+          await setDoc(adDocRef, localData);
+          return localData;
+        } else {
+          // If completely empty in both, seed the initial default safely
+          await setDoc(adDocRef, DEFAULT_AD_SETTINGS);
+          setLocalStorageData("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+          return DEFAULT_AD_SETTINGS;
+        }
       }
     } catch (e) {
       console.warn("Firestore fetch ad settings failed. Falling back to LocalStorage.", e);
@@ -478,9 +486,9 @@ export async function updateAdSettings(settings: AdSettings): Promise<void> {
 
 // Method to reset database back to initial pristine seed values
 export async function resetToSeedData(): Promise<void> {
+  // Reset videos and categories only. Do NOT wipe user ad settings/scripts!
   setLocalStorageData("cineflex_v2_videos", DEFAULT_VIDEOS);
   setLocalStorageData("cineflex_v2_categories", DEFAULT_CATEGORIES);
-  setLocalStorageData("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
 
   if (isFirebaseConfigured && db) {
     try {
@@ -491,7 +499,14 @@ export async function resetToSeedData(): Promise<void> {
       for (const cat of DEFAULT_CATEGORIES) {
         await setDoc(doc(db, "categories", cat.id), cat);
       }
-      await setDoc(doc(db, "adSettings", "global"), DEFAULT_AD_SETTINGS);
+      
+      // Preserve existing ad settings in Firestore if they are present!
+      const adDocRef = doc(db, "adSettings", "global");
+      const snap = await getDoc(adDocRef);
+      if (!snap.exists()) {
+        await setDoc(adDocRef, DEFAULT_AD_SETTINGS);
+        setLocalStorageData("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+      }
     } catch (e) {
       console.error("Firebase bulk reset failed:", e);
     }
@@ -511,25 +526,60 @@ export const DEFAULT_ADMIN_SECURITY: AdminSecurity = {
 
 export async function getAdminSecurity(): Promise<AdminSecurity> {
   const path = "adminSecurity/config";
+  let fetchedPassword = "";
+
   if (isFirebaseConfigured && db) {
+    try {
+      const settingsPassRef = doc(db, "settings", "adminPassword");
+      const settingsSnap = await getDoc(settingsPassRef);
+      if (settingsSnap.exists()) {
+        const settingsData = settingsSnap.data();
+        if (settingsData && (settingsData.password || settingsData.adminPassword || settingsData.value)) {
+          fetchedPassword = settingsData.password || settingsData.adminPassword || settingsData.value || "";
+        }
+      }
+    } catch (e) {
+      console.warn("Firestore fetch settings/adminPassword failed:", e);
+    }
+
     try {
       const docRef = doc(db, "adminSecurity", "config");
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data() as AdminSecurity;
+        if (fetchedPassword) {
+          data.password = fetchedPassword;
+        }
         setLocalStorageData("viralbd99_admin_security", data);
         return data;
       } else {
         // Document doesn't exist yet, seed it!
-        await setDoc(docRef, DEFAULT_ADMIN_SECURITY);
-        setLocalStorageData("viralbd99_admin_security", DEFAULT_ADMIN_SECURITY);
-        return DEFAULT_ADMIN_SECURITY;
+        const initialSec = { ...DEFAULT_ADMIN_SECURITY };
+        if (fetchedPassword) {
+          initialSec.password = fetchedPassword;
+        } else {
+          // Sync default password to settings/adminPassword as well so they are in sync
+          try {
+            const settingsPassRef = doc(db, "settings", "adminPassword");
+            await setDoc(settingsPassRef, { password: DEFAULT_ADMIN_SECURITY.password });
+          } catch (err) {
+            console.warn("Seeding initial settings/adminPassword failed:", err);
+          }
+        }
+        await setDoc(docRef, initialSec);
+        setLocalStorageData("viralbd99_admin_security", initialSec);
+        return initialSec;
       }
     } catch (e) {
       console.warn("Firestore fetch admin security failed:", e);
     }
   }
-  return getLocalStorageData<AdminSecurity>("viralbd99_admin_security", DEFAULT_ADMIN_SECURITY);
+
+  const localVal = getLocalStorageData<AdminSecurity>("viralbd99_admin_security", DEFAULT_ADMIN_SECURITY);
+  if (fetchedPassword) {
+    localVal.password = fetchedPassword;
+  }
+  return localVal;
 }
 
 export async function updateAdminSecurity(fields: Partial<AdminSecurity>): Promise<void> {
@@ -543,6 +593,19 @@ export async function updateAdminSecurity(fields: Partial<AdminSecurity>): Promi
     try {
       const docRef = doc(db, "adminSecurity", "config");
       await setDoc(docRef, updated); // Use setDoc so it works even if it doesn't exist
+
+      if (fields.password !== undefined) {
+        try {
+          const settingsPassRef = doc(db, "settings", "adminPassword");
+          await setDoc(settingsPassRef, { 
+            password: fields.password, 
+            value: fields.password, 
+            adminPassword: fields.password 
+          });
+        } catch (settingsError) {
+          console.warn("Failed to write to settings/adminPassword:", settingsError);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -1152,6 +1215,27 @@ export function setupRealtimeVisitorStats(onStatsUpdate: (stats: VisitorStatsRec
           thisYearDate: yearStr,
           total: (currentData.total || 0) + 1
         };
+      }).then(() => {
+        try {
+          const d = new Date();
+          const todayStr = d.toISOString().split('T')[0];
+          const hourStr = String(d.getUTCHours()).padStart(2, '0');
+          const hourlyKey = `${todayStr}-${hourStr}`;
+
+          const hourlyRef = rtdbRef(rtdb, `analytics/hourly/${hourlyKey}`);
+          rtdbRunTransaction(hourlyRef, (cur) => {
+            if (!cur) return { visitors: 1 };
+            return { visitors: (cur.visitors || 0) + 1 };
+          }).catch(err => console.warn("Hourly stats write failed:", err));
+
+          const dailyRef = rtdbRef(rtdb, `analytics/daily/${todayStr}`);
+          rtdbRunTransaction(dailyRef, (cur) => {
+            if (!cur) return { visitors: 1 };
+            return { visitors: (cur.visitors || 0) + 1 };
+          }).catch(err => console.warn("Daily stats write failed:", err));
+        } catch (innerErr) {
+          console.warn("Hourly/Daily logging failed inside then:", innerErr);
+        }
       }).catch((err) => {
         console.warn("RTDB visitor stats increment transaction bypassed:", err);
       });

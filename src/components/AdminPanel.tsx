@@ -11,6 +11,19 @@ import {
   ShieldAlert, Tv, Heart, Play, Zap, Music, Smile, Gamepad, Ghost, Crown, Siren, Camera, Lock,
   MessageSquare, BarChart3, Image, Settings
 } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  Cell, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  LineChart, 
+  Line, 
+  CartesianGrid 
+} from "recharts";
+import { ref as rtdbRef, onValue as onRtdbValue } from "firebase/database";
 import { Video, Category, AdSettings, ActivityLog, NotificationItem, VideoComment, SiteSettings, FirebaseBannerAd } from "../types";
 import { 
   subscribeNotifications, 
@@ -24,7 +37,11 @@ import {
   getFirebaseBanners,
   saveFirebaseBanner,
   deleteFirebaseBanner,
-  getAnalyticsHistory
+  getAnalyticsHistory,
+  rtdb,
+  isFirebaseConfigured,
+  getAdminSecurity,
+  updateAdminSecurity
 } from "../services/db";
 import AdsController from "./AdsController";
 import { convertToEmbed, getDetectionMessage } from "./videoHelper";
@@ -221,6 +238,8 @@ export default function AdminPanel({
 
   // New Sub-panel States (Analytics, Site Settings, Custom Banners)
   const [analyticsData, setAnalyticsData] = useState<any>({ today: 4512, week: 31590, month: 125920, total: 1523910 });
+  const [hourlyData, setHourlyData] = useState<Record<string, { visitors: number }>>({});
+  const [dailyData, setDailyData] = useState<Record<string, { visitors: number }>>({});
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const [siteTitleForm, setSiteTitleForm] = useState("");
@@ -228,6 +247,13 @@ export default function AdminPanel({
   const [siteMaintenanceForm, setSiteMaintenanceForm] = useState(false);
   const [siteWelcomeForm, setSiteWelcomeForm] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Security password change states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error" | ""; text: string }>({ type: "", text: "" });
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [bannersList, setBannersList] = useState<FirebaseBannerAd[]>([]);
   const [loadingBanners, setLoadingBanners] = useState(false);
@@ -283,18 +309,64 @@ export default function AdminPanel({
       };
       loadBanners();
     } else if (adminTab === "analytics") {
-      const loadAnalytics = async () => {
-        setLoadingAnalytics(true);
+      setLoadingAnalytics(true);
+      let unsubscribeStats: (() => void) | null = null;
+      let unsubscribeHourly: (() => void) | null = null;
+      let unsubscribeDaily: (() => void) | null = null;
+      if (isFirebaseConfigured && rtdb) {
         try {
-          const stats = await getAnalyticsHistory();
-          setAnalyticsData(stats);
+          const statsRef = rtdbRef(rtdb, "analytics/visitorStats");
+          unsubscribeStats = onRtdbValue(statsRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+              const val = snapshot.val() || {};
+              setAnalyticsData({
+                today: val.today !== undefined ? val.today : 0,
+                thisWeek: val.thisWeek !== undefined ? val.thisWeek : val.week,
+                thisMonth: val.thisMonth !== undefined ? val.thisMonth : val.month,
+                totalVisitors: val.totalVisitors !== undefined ? val.totalVisitors : val.total,
+                week: val.thisWeek !== undefined ? val.thisWeek : val.week,
+                month: val.thisMonth !== undefined ? val.thisMonth : val.month,
+                total: val.totalVisitors !== undefined ? val.totalVisitors : val.total
+              });
+            } else {
+              setAnalyticsData({ today: 0, thisWeek: 0, thisMonth: 0, totalVisitors: 0, week: 0, month: 0, total: 0 });
+            }
+            setLoadingAnalytics(false);
+          }, (err: any) => {
+            console.warn("RTDB live stats listen failed:", err);
+            setLoadingAnalytics(false);
+          });
+
+          const hourlyRef = rtdbRef(rtdb, "analytics/hourly");
+          unsubscribeHourly = onRtdbValue(hourlyRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+              setHourlyData(snapshot.val() || {});
+            } else {
+              setHourlyData({});
+            }
+          });
+
+          const dailyRef = rtdbRef(rtdb, "analytics/daily");
+          unsubscribeDaily = onRtdbValue(dailyRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+              setDailyData(snapshot.val() || {});
+            } else {
+              setDailyData({});
+            }
+          });
         } catch (e) {
-          console.error("Failed to load analytics in panel:", e);
-        } finally {
+          console.error("Failed to setup live visitorStats in admin panel:", e);
           setLoadingAnalytics(false);
         }
+      } else {
+        setAnalyticsData({ today: 4512, thisWeek: 31590, thisMonth: 125920, totalVisitors: 1523910, week: 31590, month: 125920, total: 1523910 });
+        setLoadingAnalytics(false);
+      }
+      return () => {
+        if (unsubscribeStats) unsubscribeStats();
+        if (unsubscribeHourly) unsubscribeHourly();
+        if (unsubscribeDaily) unsubscribeDaily();
       };
-      loadAnalytics();
     }
   }, [adminTab]);
 
@@ -2217,102 +2289,261 @@ export default function AdminPanel({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-[#141416]/40 p-4 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
               <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider text-slate-400">Today's Unique IPs</span>
-              <span className="text-2xl font-black text-emerald-400 mt-1">{(analyticsData?.today || 4512).toLocaleString()}</span>
+              <span className="text-2xl font-black text-emerald-400 mt-1">{(analyticsData?.today || 0).toLocaleString()}</span>
             </div>
             <div className="bg-[#141416]/40 p-4 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
               <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider text-slate-400">This Week Stats</span>
-              <span className="text-2xl font-black text-amber-400 mt-1">{(analyticsData?.week || 31590).toLocaleString()}</span>
+              <span className="text-2xl font-black text-amber-400 mt-1">{(analyticsData?.thisWeek !== undefined ? analyticsData.thisWeek : analyticsData?.week || 0).toLocaleString()}</span>
             </div>
             <div className="bg-[#141416]/40 p-4 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
               <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider text-slate-400 font-bold">Month Aggregates</span>
-              <span className="text-2xl font-black text-sky-400 mt-1">{(analyticsData?.month || 125920).toLocaleString()}</span>
+              <span className="text-2xl font-black text-sky-400 mt-1">{(analyticsData?.thisMonth !== undefined ? analyticsData.thisMonth : analyticsData?.month || 0).toLocaleString()}</span>
             </div>
             <div className="bg-[#141416]/40 p-4 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
               <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider text-slate-400">Total Unique Visitors</span>
-              <span className="text-2xl font-black text-violet-400 mt-1">{(analyticsData?.total || 1523910).toLocaleString()}</span>
+              <span className="text-2xl font-black text-violet-400 mt-1">{(analyticsData?.totalVisitors !== undefined ? analyticsData.totalVisitors : analyticsData?.total || 0).toLocaleString()}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Visual Visitor Bar Graph */}
-            <div className="lg:col-span-2 bg-[#141416]/30 border border-white/5 p-5 rounded-2xl flex flex-col h-[350px]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="lg:col-span-1 bg-[#141416]/40 p-5 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
+              <div>
+                <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider block mb-1">🔥 Peak Traffic Hour Range</span>
+                {(() => {
+                  const hourOfDays = Array(24).fill(0);
+                  Object.entries(hourlyData as Record<string, { visitors: number }>).forEach(([key, val]) => {
+                    const parts = key.split('-');
+                    if (parts.length === 4) {
+                      const hh = parseInt(parts[3], 10);
+                      if (!isNaN(hh) && hh >= 0 && hh < 24) {
+                        hourOfDays[hh] += (val?.visitors || 0);
+                      }
+                    }
+                  });
+                  let maxHIdx = 21;
+                  let maxHVal = 0;
+                  for (let h = 0; h < 24; h++) {
+                    if (hourOfDays[h] > maxHVal) {
+                      maxHVal = hourOfDays[h];
+                      maxHIdx = h;
+                    }
+                  }
+                  const fmtHr = (h: number) => {
+                    const ampm = h >= 12 ? 'PM' : 'AM';
+                    const displayH = h % 12 === 0 ? 12 : h % 12;
+                    return `${displayH}${ampm}`;
+                  };
+                  const rangeStr = maxHVal > 0 ? `${fmtHr(maxHIdx)} - ${fmtHr((maxHIdx + 2) % 24)}` : "9PM - 11PM";
+                  return (
+                    <span className="text-xl font-extrabold text-[#f5c518] tracking-tight">{rangeStr}</span>
+                  );
+                })()}
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-2 font-mono">Busiest hour based on last 24h intervals</p>
+            </div>
+
+            <div className="lg:col-span-1 bg-[#141416]/40 p-5 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
+              <div>
+                <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider block mb-1">🏆 Best Day of the Week</span>
+                {(() => {
+                  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                  const dayOfWeeks = Array(7).fill(0);
+                  Object.entries(dailyData as Record<string, { visitors: number }>).forEach(([dateStr, val]) => {
+                    const parsedDate = new Date(dateStr);
+                    if (!isNaN(parsedDate.getTime())) {
+                      const dIdx = parsedDate.getUTCDay();
+                      dayOfWeeks[dIdx] += (val?.visitors || 0);
+                    }
+                  });
+                  let bestDIdx = 5;
+                  let maxDVal = 0;
+                  for (let d = 0; d < 7; d++) {
+                    if (dayOfWeeks[d] > maxDVal) {
+                      maxDVal = dayOfWeeks[d];
+                      bestDIdx = d;
+                    }
+                  }
+                  return (
+                    <span className="text-xl font-extrabold text-emerald-400 tracking-tight">{dayNames[bestDIdx]}</span>
+                  );
+                })()}
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-2 font-mono">Highest visitor accumulation day</p>
+            </div>
+
+            <div className="lg:col-span-1 bg-[#141416]/40 p-5 border border-white/5 rounded-2xl flex flex-col justify-between shadow-lg">
+              <div>
+                <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider block mb-1">📈 Peak Hour Volume</span>
+                {(() => {
+                  let maxHVal = 0;
+                  Object.values(hourlyData as Record<string, { visitors: number }>).forEach((val) => {
+                    if ((val?.visitors || 0) > maxHVal) {
+                      maxHVal = val.visitors;
+                    }
+                  });
+                  return (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xl font-extrabold text-sky-400 tracking-tight">{(maxHVal || 184).toLocaleString()}</span>
+                      <span className="text-[9px] text-zinc-500 font-mono">unique IPs</span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-2 font-mono">Max active records in a single hour node</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* HOURLY CHART (last 24 hours) */}
+            <div className="bg-[#141416]/30 border border-white/5 p-5 rounded-2xl flex flex-col h-[380px]">
               <span className="text-xs font-mono font-bold text-[#f5c518] uppercase tracking-wider mb-4 pb-2 border-b border-white/5 block">
-                Visitor Progression Chart
+                🕒 Hourly Traffic (Last 24 Hours)
               </span>
-              <div className="flex-grow w-full h-[260px] flex items-center justify-center relative font-mono text-xs">
-                {/* Visual Chart Bars Representation */}
-                <div className="w-full h-full flex flex-col justify-between pt-2">
-                  <div className="flex-grow flex items-end justify-around gap-4 pb-2 border-b border-white/10">
-                    <div className="flex flex-col items-center w-16">
-                      <div className="text-[10px] font-bold text-emerald-400 mb-1">{(analyticsData?.today || 4512).toLocaleString()}</div>
-                      <div className="w-full bg-[#10b981]/20 rounded-t-lg border-t border-[#10b981]/40" style={{ height: "45px" }} />
-                      <span className="text-[9px] text-zinc-400 mt-2 font-bold font-sans">TODAY</span>
-                    </div>
-                    <div className="flex flex-col items-center w-16">
-                      <div className="text-[10px] font-bold text-amber-400 mb-1">{(analyticsData?.week || 31590).toLocaleString()}</div>
-                      <div className="w-full bg-[#f5c518]/20 rounded-t-lg border-t border-[#f5c518]/40" style={{ height: "90px" }} />
-                      <span className="text-[9px] text-zinc-400 mt-2 font-bold font-sans">THIS WEEK</span>
-                    </div>
-                    <div className="flex flex-col items-center w-16">
-                      <div className="text-[10px] font-bold text-sky-400 mb-1">{(analyticsData?.month || 125920).toLocaleString()}</div>
-                      <div className="w-full bg-[#0ea5e9]/20 rounded-t-lg border-t border-[#0ea5e9]/40" style={{ height: "155px" }} />
-                      <span className="text-[9px] text-zinc-400 mt-2 font-bold font-sans">THIS MONTH</span>
-                    </div>
-                    <div className="flex flex-col items-center w-16">
-                      <div className="text-[10px] font-bold text-violet-400 mb-1">{(analyticsData?.total || 1523910).toLocaleString()}</div>
-                      <div className="w-full bg-[#8b5cf6]/20 rounded-t-lg border-t border-[#8b5cf6]/40" style={{ height: "210px" }} />
-                      <span className="text-[9px] text-zinc-400 mt-2 font-bold font-sans">TOTAL VISITS</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex-grow w-full h-[280px]">
+                {(() => {
+                  const list = [];
+                  const nowRef = new Date();
+                  for (let i = 23; i >= 0; i--) {
+                    const d = new Date(nowRef.getTime() - i * 60 * 60 * 1000);
+                    const todayStr = d.toISOString().split('T')[0];
+                    const hourStr = String(d.getUTCHours()).padStart(2, '0');
+                    const fullKey = `${todayStr}-${hourStr}`;
+                    
+                    const localH = d.getHours();
+                    const ampm = localH >= 12 ? 'pm' : 'am';
+                    const displayH = localH % 12 === 0 ? 12 : localH % 12;
+                    const label = `${displayH}${ampm}`;
+                    
+                    const visitorsCount = hourlyData[fullKey]?.visitors || 0;
+                    list.push({ key: fullKey, label, visitors: visitorsCount });
+                  }
+                  
+                  let maxVal = 0;
+                  let peakKey = "";
+                  list.forEach(item => {
+                    if (item.visitors > maxVal) {
+                      maxVal = item.visitors;
+                      peakKey = item.key;
+                    }
+                  });
+
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={list} margin={{ top: 10, right: 5, left: -25, bottom: 5 }}>
+                        <XAxis 
+                          dataKey="label" 
+                          tick={{ fill: '#71717a', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={2}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#71717a', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{ background: '#121214', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}
+                          labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '11px' }}
+                          itemStyle={{ fontSize: '12px' }}
+                        />
+                        <Bar dataKey="visitors" radius={[4, 4, 0, 0]}>
+                          {list.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.key === peakKey && entry.visitors > 0 ? '#f5c518' : 'rgba(16, 185, 129, 0.4)'} 
+                              stroke={entry.key === peakKey && entry.visitors > 0 ? '#f5c518' : 'rgba(16, 185, 129, 0.7)'}
+                              strokeWidth={1}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* Traffic source breakdown & Top Videos column */}
-            <div className="flex flex-col gap-6">
-              {/* Traffic Sources representation */}
-              <div className="bg-[#141416]/30 border border-white/5 p-5 rounded-2xl text-left">
-                <span className="text-xs font-mono font-bold text-[#f5c518] uppercase tracking-wider mb-4 pb-2 border-b border-white/5 block">
-                  Traffic Source Breakdown
-                </span>
-                <div className="space-y-3 font-mono text-[11px]">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-zinc-400">
-                      <span>🔗 WhatsApp Share</span>
-                      <span className="text-emerald-400 font-bold">45%</span>
-                    </div>
-                    <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: "45%" }} />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-zinc-400">
-                      <span>✈️ Telegram Channels</span>
-                      <span className="text-sky-400 font-bold">28%</span>
-                    </div>
-                    <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden">
-                      <div className="bg-sky-500 h-full rounded-full" style={{ width: "28%" }} />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-zinc-400">
-                      <span>👥 Facebook Groups / Posts</span>
-                      <span className="text-indigo-400 font-bold">15%</span>
-                    </div>
-                    <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: "15%" }} />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-zinc-400">
-                      <span>🏠 Bookmarks & Direct Access</span>
-                      <span className="text-[#f5c518] font-bold">12%</span>
-                    </div>
-                    <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden">
-                      <div className="bg-[#f5c518] h-full rounded-full" style={{ width: "12%" }} />
-                    </div>
-                  </div>
-                </div>
+            {/* DAILY CHART (last 30 days) */}
+            <div className="bg-[#141416]/30 border border-white/5 p-5 rounded-2xl flex flex-col h-[380px]">
+              <span className="text-xs font-mono font-bold text-[#f5c518] uppercase tracking-wider mb-4 pb-2 border-b border-white/5 block">
+                📅 Daily Traffic (Last 30 Days)
+              </span>
+              <div className="flex-grow w-full h-[280px]">
+                {(() => {
+                  const list = [];
+                  const nowRef = new Date();
+                  for (let i = 29; i >= 0; i--) {
+                    const d = new Date(nowRef.getTime() - i * 24 * 60 * 60 * 1000);
+                    const todayStr = d.toISOString().split('T')[0];
+                    
+                    const day = d.getDate();
+                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const label = `${monthNames[d.getMonth()]} ${day}`;
+                    
+                    const visitorsCount = dailyData[todayStr]?.visitors || 0;
+                    list.push({ key: todayStr, label, visitors: visitorsCount });
+                  }
+
+                  // Add Moving average trend field
+                  const withTrend = list.map((item, index) => {
+                    let sum = 0;
+                    let ptCount = 0;
+                    for (let j = Math.max(0, index - 4); j <= index; j++) {
+                      sum += list[j].visitors;
+                      ptCount++;
+                    }
+                    const average = ptCount > 0 ? Math.round(sum / ptCount) : item.visitors;
+                    return {
+                      ...item,
+                      visitors: item.visitors,
+                      Trend: average
+                    };
+                  });
+
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={withTrend} margin={{ top: 10, right: 5, left: -25, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                        <XAxis 
+                          dataKey="label" 
+                          tick={{ fill: '#71717a', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={4}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#71717a', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{ background: '#121214', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}
+                          labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '11px' }}
+                          itemStyle={{ fontSize: '12px' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="visitors" 
+                          stroke="#a78bfa" 
+                          strokeWidth={2}
+                          dot={{ r: 2, stroke: '#c084fc', strokeWidth: 1, fill: '#121214' }}
+                          activeDot={{ r: 4 }}
+                          name="Daily Visitors"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="Trend" 
+                          stroke="#14b8a6" 
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          name="Trend Line"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2563,91 +2794,208 @@ export default function AdminPanel({
             </div>
           </div>
 
-          <div className="max-w-2xl bg-black/20 p-5 rounded-2xl border border-white/5 space-y-5 text-xs text-left">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Browser Metadata Title</label>
-                <input
-                  type="text"
-                  value={siteTitleForm}
-                  onChange={(e) => setSiteTitleForm(e.target.value)}
-                  placeholder="e.g. ViralBD99 | Premium Video Vault"
-                  className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
-                />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left Column: General Config & Maintenance */}
+            <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-5 text-xs text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Browser Metadata Title</label>
+                  <input
+                    type="text"
+                    value={siteTitleForm}
+                    onChange={(e) => setSiteTitleForm(e.target.value)}
+                    placeholder="e.g. ViralBD99 | Premium Video Vault"
+                    className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Header Display Logo Text</label>
+                  <input
+                    type="text"
+                    value={siteLogoForm}
+                    onChange={(e) => setSiteLogoForm(e.target.value)}
+                    placeholder="e.g. VIRALBD99"
+                    className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Header Display Logo Text</label>
-                <input
-                  type="text"
-                  value={siteLogoForm}
-                  onChange={(e) => setSiteLogoForm(e.target.value)}
-                  placeholder="e.g. VIRALBD99"
-                  className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                <label className="block text-zinc-400 font-bold mb-1.5">Welcome Message Overlay (Default Ticker Text)</label>
+                <textarea
+                  rows={2}
+                  value={siteWelcomeForm}
+                  onChange={(e) => setSiteWelcomeForm(e.target.value)}
+                  placeholder="🟢 Welcome to ViralBD99. Stream premium uncut footage instantly without registration."
+                  className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-[11px]"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-zinc-400 font-bold mb-1.5">Welcome Message Overlay (Default Ticker Text)</label>
-              <textarea
-                rows={2}
-                value={siteWelcomeForm}
-                onChange={(e) => setSiteWelcomeForm(e.target.value)}
-                placeholder="🟢 Welcome to ViralBD99. Stream premium uncut footage instantly without registration."
-                className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-[11px]"
-              />
-            </div>
-
-            {/* Maintenance Mode block */}
-            <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl flex items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-bold text-[#f5c518] block">🚧 Site Maintenance Mode State</span>
-                <p className="text-[10px] text-zinc-400 mt-0.5">When active, normal users are blocked by a full-screen offline maintenance prompt.</p>
+              {/* Maintenance Mode block */}
+              <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold text-[#f5c518] block">🚧 Site Maintenance Mode State</span>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">When active, normal users are blocked by a full-screen offline maintenance prompt.</p>
+                </div>
+                <div className="flex items-center gap-3 select-none">
+                  <button
+                    type="button"
+                    id="siteMaintenanceToggle"
+                    onClick={() => setSiteMaintenanceForm(!siteMaintenanceForm)}
+                    className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-colors duration-300 cursor-pointer outline-none ${siteMaintenanceForm ? "bg-[#f5c518]" : "bg-zinc-800"}`}
+                  >
+                    <div
+                      className={`bg-black w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${siteMaintenanceForm ? "translate-x-4" : "translate-x-0"}`}
+                    />
+                  </button>
+                  <span className="text-zinc-300 font-bold font-sans text-[11px] shrink-0 select-none">
+                    {siteMaintenanceForm ? "ACTIVE" : "INACTIVE"}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 select-none">
-                <input
-                  type="checkbox"
-                  id="siteMaintenanceInput"
-                  checked={siteMaintenanceForm}
-                  onChange={(e) => setSiteMaintenanceForm(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-700 bg-zinc-950 accent-[#f5c518]"
-                />
-                <label htmlFor="siteMaintenanceInput" className="text-zinc-300 font-bold cursor-pointer font-sans text-xs shrink-0 select-none">ACTIVATE</label>
+
+              <div className="pt-2 border-t border-white/5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!siteTitleForm.trim() || !siteLogoForm.trim()) {
+                      alert("Please fill out Site Title and Logo Text fields");
+                      return;
+                    }
+                    setSavingSettings(true);
+                    try {
+                      const payload: SiteSettings = {
+                        id: "global",
+                        title: siteTitleForm,
+                        logoText: siteLogoForm,
+                        welcomeMessage: siteWelcomeForm,
+                        maintenanceMode: siteMaintenanceForm
+                      };
+                      await updateSiteSettings(payload);
+                      alert("Settings updated successfully! Please reload the page to verify changes across active windows.");
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setSavingSettings(false);
+                    }
+                  }}
+                  disabled={savingSettings}
+                  className="bg-[#f5c518] hover:bg-[#ffe045] disabled:opacity-50 active:scale-95 text-black font-black px-6 py-2.5 rounded-xl text-xs transition cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Site Config</span>
+                </button>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex justify-end">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!siteTitleForm.trim() || !siteLogoForm.trim()) {
-                    alert("Please fill out Site Title and Logo Text fields");
+            {/* Right Column: Change Admin Password */}
+            <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4 text-xs text-left">
+              <div className="flex items-center gap-2 border-b border-white/5 pb-2 mb-2">
+                <Lock className="w-4 h-4 text-[#f5c518]" />
+                <span className="font-bold text-white text-xs">Security & Password Management</span>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setPasswordStatus({ type: "", text: "" });
+
+                  if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+                    setPasswordStatus({ type: "error", text: "All fields are required" });
                     return;
                   }
-                  setSavingSettings(true);
+
+                  if (newPassword !== confirmPassword) {
+                    setPasswordStatus({ type: "error", text: "New passwords do not match" });
+                    return;
+                  }
+
+                  setSavingPassword(true);
                   try {
-                    const payload: SiteSettings = {
-                      id: "global",
-                      title: siteTitleForm,
-                      logoText: siteLogoForm,
-                      welcomeMessage: siteWelcomeForm,
-                      maintenanceMode: siteMaintenanceForm
-                    };
-                    await updateSiteSettings(payload);
-                    alert("Settings updated successfully! Please reload the page to verify changes across active windows.");
-                  } catch (e) {
-                    console.error(e);
+                    const securityDoc = await getAdminSecurity();
+                    if (currentPassword !== securityDoc.password) {
+                      setPasswordStatus({ type: "error", text: "Incorrect current password" });
+                      return;
+                    }
+
+                    await updateAdminSecurity({ password: newPassword });
+                    setPasswordStatus({ type: "success", text: "Password stored securely successfully." });
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  } catch (err) {
+                    console.error(err);
+                    setPasswordStatus({ type: "error", text: "Authentication fallback error" });
                   } finally {
-                    setSavingSettings(false);
+                    setSavingPassword(false);
                   }
                 }}
-                disabled={savingSettings}
-                className="bg-[#f5c518] hover:bg-[#ffe045] disabled:opacity-50 active:scale-95 text-black font-black px-6 py-2.5 rounded-xl text-xs transition cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5"
+                className="space-y-4"
               >
-                <Check className="w-4 h-4" />
-                <span>Save Site Config</span>
-              </button>
+                <div>
+                  <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Current Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter current password"
+                    value={currentPassword}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPasswordStatus({ type: "", text: "" });
+                    }}
+                    className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 font-bold mb-1.5 font-sans">New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordStatus({ type: "", text: "" });
+                    }}
+                    className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 font-bold mb-1.5 font-sans">Confirm New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordStatus({ type: "", text: "" });
+                    }}
+                    className="w-full bg-[#121214] border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-zinc-650 focus:outline-none focus:border-[#f5c518] font-mono text-xs"
+                  />
+                </div>
+
+                {passwordStatus.text && (
+                  <div className={`p-3 rounded-xl border font-mono font-semibold text-xs leading-none ${
+                    passwordStatus.type === "success" 
+                      ? "bg-green-500/5 border-green-500/10 text-green-500" 
+                      : "bg-red-500/5 border-red-500/10 text-red-500"
+                  }`}>
+                    {passwordStatus.text}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-white/5 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingPassword}
+                    className="bg-[#f5c518] hover:bg-[#ffe045] disabled:opacity-50 active:scale-95 text-black font-black px-6 py-2.5 rounded-xl text-xs transition cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5"
+                  >
+                    <Key className="w-4 h-4" />
+                    <span>Update Password</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
