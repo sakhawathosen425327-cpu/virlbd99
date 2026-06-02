@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
 import { Sliders, Tv, Film, Download, X, Info, ShieldCheck, FileText, Mail, Heart, Globe, AlertTriangle, ExternalLink, Send, Facebook, MessageCircle, Flame, Clock, Sparkles, Award, History, Bookmark, Trash2, Play, User } from "lucide-react";
 import { Video, Category, AdSettings, ViewTab, ActivityLog, SiteSettings, FirebaseBannerAd } from "./types";
 import { 
@@ -104,9 +103,6 @@ const PRELOADER_MESSAGES = [
 ];
 
 export default function App() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
   // Database States
   const [videos, setVideos] = useState<Video[]>([]);
   const trendingScrollRef = useRef<HTMLDivElement>(null);
@@ -621,34 +617,26 @@ export default function App() {
 
   // Helper to extract video ID from either standard /video/VIDEO_ID or legacy ?video=VIDEO_ID format
   const getVideoIdFromUrl = () => {
-    const path = location.pathname;
+    const path = window.location.pathname;
     const match = path.match(/\/video\/([a-zA-Z0-9_-]+)/);
     if (match) {
       return match[1];
     }
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(window.location.search);
     return params.get("video");
   };
 
-  // 1. Sync active playing video with the URL from React Router
+  // 1. Auto-open video from shared URL on initial load of videos
   useEffect(() => {
     if (videos.length === 0) return;
-    const urlVideoId = getVideoIdFromUrl();
-    if (urlVideoId) {
-      const match = videos.find((v) => v.id === urlVideoId);
+    const videoId = getVideoIdFromUrl();
+    if (videoId) {
+      const match = videos.find((v) => v.id === videoId);
       if (match) {
-        if (!activePlayingVideo || activePlayingVideo.id !== match.id) {
-          setActivePlayingVideo(match);
-        }
-      } else {
-        setActivePlayingVideo(null);
-      }
-    } else {
-      if (activePlayingVideo) {
-        setActivePlayingVideo(null);
+        setActivePlayingVideo(match);
       }
     }
-  }, [location.pathname, location.search, videos]);
+  }, [videos]);
 
   // 2. Clear or set URL paths & Browser tab Title dynamically on video change
   useEffect(() => {
@@ -661,17 +649,39 @@ export default function App() {
       document.title = `${activePlayingVideo.title} | ${shortTitle}`;
       
       if (currentVideoIdInUrl !== videoId) {
-        navigate(`/video/${videoId}`);
+        const newUrl = `${window.location.origin}/video/${videoId}`;
+        window.history.pushState({ videoId }, "", newUrl);
       }
     } else {
       // Reset default page title
       document.title = siteSettings.title;
       
       if (currentVideoIdInUrl) {
-        navigate("/");
+        const newUrl = `${window.location.origin}/`;
+        window.history.pushState(null, "", newUrl);
       }
     }
   }, [activePlayingVideo]);
+
+  // 3. Listen for popstate (Back/Forward browser keys) events to keep player matches updated
+  useEffect(() => {
+    const handlePopState = () => {
+      const videoId = getVideoIdFromUrl();
+      if (videoId) {
+        const match = videos.find((v) => v.id === videoId);
+        if (match) {
+          setActivePlayingVideo(match);
+        } else {
+          setActivePlayingVideo(null);
+        }
+      } else {
+        setActivePlayingVideo(null);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [videos]);
 
   const handleUpdateAdSettings = async (settings: AdSettings) => {
     await updateAdSettings(settings);
@@ -1020,7 +1030,6 @@ export default function App() {
     // Safely trigger Adsterra popunder or direct link according to capping & timers
     triggerPopunderAction();
 
-    navigate(`/video/${video.id}`);
     setActivePlayingVideo(video);
     // Update view counters asynchronously
     try {
@@ -1673,10 +1682,7 @@ export default function App() {
           <VideoPlayerModal
             video={activePlayingVideo}
             allVideos={videos}
-            onClose={() => {
-              setActivePlayingVideo(null);
-              navigate("/");
-            }}
+            onClose={() => setActivePlayingVideo(null)}
             onPlayVideo={handlePlayVideo}
             adSettings={adSettings}
             bookmarkedIds={bookmarkedIds}

@@ -437,8 +437,8 @@ export default function VideoPlayerModal({
   };
 
   const handleCopyLink = () => {
-    // Generate direct unique video page URL
-    const shareUrl = `${window.location.origin}/video/${video.id}`;
+    // Generate unique param compatible with client search extract parameters
+    const shareUrl = `${window.location.origin}/?v=${video.id}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -448,7 +448,7 @@ export default function VideoPlayerModal({
   };
 
   const handleShare = (platform?: string) => {
-    const shareUrl = `${window.location.origin}/video/${video.id}`;
+    const shareUrl = `${window.location.origin}/?v=${video.id}`;
     const shareTitle = `শরম গরম ভিডিও: ${video.title} এখনই দেখুন ViralBD99-এ!`;
 
     if (!platform && navigator.share) {

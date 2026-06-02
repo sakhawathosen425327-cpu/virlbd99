@@ -21,11 +21,13 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { Video, Category, AdSettings, AdminSecurity, ActivityLog, DailyAdStats, VideoComment, VideoCommentReply, NotificationItem, VideoRating, VideoRatingStats, SiteSettings, FirebaseBannerAd } from "../types";
 import { getDatabase, ref as rtdbRef, onValue as onRtdbValue, set as setRtdb, onDisconnect as onRtdbDisconnect, runTransaction as rtdbRunTransaction } from "firebase/database";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 export let rtdb: any = null;
+export let storage: any = null;
 
 // Dynamic configuration check to protect against missing credentials or bootstrap placeholders
 export const isFirebaseConfigured = 
@@ -67,6 +69,11 @@ if (isFirebaseConfigured) {
       rtdb = getDatabase(app);
     } catch (dbErr) {
       console.warn("Realtime Database initialization skipped:", dbErr);
+    }
+    try {
+      storage = getStorage(app);
+    } catch (storageErr) {
+      console.warn("Storage initialization failed:", storageErr);
     }
   } catch (error) {
     console.error("Firebase Initialization Error:", error);
@@ -169,7 +176,7 @@ export const DEFAULT_VIDEOS: Video[] = [
     category: "viral",
     duration: "4m 20s",
     rating: "18+",
-    views: 145200,
+    views: 0,
     isTrending: true,
     isLatest: true
   },
@@ -182,7 +189,7 @@ export const DEFAULT_VIDEOS: Video[] = [
     category: "asian",
     duration: "3m 45s",
     rating: "18+",
-    views: 89400,
+    views: 0,
     isTrending: true,
     isLatest: false
   },
@@ -195,7 +202,7 @@ export const DEFAULT_VIDEOS: Video[] = [
     category: "exclusive",
     duration: "5m 12s",
     rating: "18+",
-    views: 231400,
+    views: 0,
     isTrending: false,
     isLatest: true
   },
@@ -208,7 +215,7 @@ export const DEFAULT_VIDEOS: Video[] = [
     category: "hd-videos",
     duration: "8m 05s",
     rating: "18+",
-    views: 412500,
+    views: 0,
     isTrending: true,
     isLatest: true
   }
@@ -1558,6 +1565,23 @@ export async function deleteFirebaseBanner(id: string): Promise<void> {
       console.warn("Firestore deleteBanner failed. Falling back to local only.", err);
       checkQuotaError(err);
     }
+  }
+}
+
+export async function uploadThumbnail(base64Data: string): Promise<string> {
+  if (!isFirebaseConfigured || !storage) {
+    console.warn("Firebase Storage is not configured. Falling back to local data URL.");
+    return base64Data;
+  }
+  try {
+    const filename = `thumbnails/thumb_${Date.now()}_${Math.floor(Math.random() * 10000)}.jpg`;
+    const imageRef = storageRef(storage, filename);
+    await uploadString(imageRef, base64Data, "data_url");
+    const downloadUrl = await getDownloadURL(imageRef);
+    return downloadUrl;
+  } catch (error) {
+    console.warn("Firebase Storage Upload Error. Gracefully falling back to local base64 data URL format:", error);
+    return base64Data;
   }
 }
 

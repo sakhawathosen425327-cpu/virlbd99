@@ -9,7 +9,7 @@ import {
   Plus, Sliders, Trash2, Edit2, Check, RefreshCw, Key, Shield, Sparkles, Film, AlertTriangle, 
   FileVideo, Eye, X, DollarSign, Bookmark, Flame, Clock, Award, Globe, Video as LucideVideo, 
   ShieldAlert, Tv, Heart, Play, Zap, Music, Smile, Gamepad, Ghost, Crown, Siren, Camera, Lock,
-  MessageSquare, BarChart3, Image, Settings
+  MessageSquare, BarChart3, Image as ImageIcon, Settings
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -41,7 +41,8 @@ import {
   rtdb,
   isFirebaseConfigured,
   getAdminSecurity,
-  updateAdminSecurity
+  updateAdminSecurity,
+  uploadThumbnail
 } from "../services/db";
 import AdsController from "./AdsController";
 import { convertToEmbed, getDetectionMessage } from "./videoHelper";
@@ -151,8 +152,13 @@ const createImage = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
     const image = new Image();
     image.addEventListener("load", () => resolve(image));
-    image.addEventListener("error", (err) => reject(err));
-    image.setAttribute("crossOrigin", "anonymous"); // to prevent CORS issues if loading cross-origin URLs
+    image.addEventListener("error", (err) => {
+      console.error("Error loading image in createImage:", err);
+      reject(new Error("Failed to load image canvas helper."));
+    });
+    if (!url.startsWith("data:")) {
+      image.setAttribute("crossOrigin", "anonymous"); // to prevent CORS issues if loading cross-origin URLs
+    }
     image.src = url;
   });
 
@@ -401,6 +407,7 @@ export default function AdminPanel({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // File upload state & handlers
   const [thumbnailMode, setThumbnailMode] = useState<"upload" | "url">("upload");
@@ -572,7 +579,7 @@ export default function AdminPanel({
         description: generatedDesc,
         duration: `${Math.floor(Math.random() * 10) + 5}m`,
         rating: "18+",
-        views: Math.floor(Math.random() * 12000) + 1500,
+        views: 0,
         createdAt: new Date().toISOString(),
         status: "published"
       };
@@ -806,7 +813,7 @@ export default function AdminPanel({
       rating,
       isTrending,
       isLatest,
-      views: parseInt(viewsCount) || (editingId ? videos.find(v => v.id === editingId)?.views || 0 : Math.floor(Math.random() * 1000) + 100),
+      views: parseInt(viewsCount) || (editingId ? videos.find(v => v.id === editingId)?.views || 0 : 0),
       createdAt: editingId ? (videos.find(v => v.id === editingId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
       scheduledAt: finalScheduledAt || undefined,
       status: status
@@ -1090,7 +1097,7 @@ export default function AdminPanel({
           }`}
           id="tab-manage-banners"
         >
-          <Image className="w-4 h-4 text-emerald-400" />
+          <ImageIcon className="w-4 h-4 text-emerald-400" />
           <span>Banner Ads ({bannersList.length})</span>
         </button>
         <button
@@ -1157,7 +1164,7 @@ export default function AdminPanel({
                       {v.title}
                     </h4>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono border-t border-white/5 pt-1.5">
-                      <span>👁️ {(v.views || 0).toLocaleString()}</span>
+                      <span>👁️ {(v.views || 0).toLocaleString()} views</span>
                       <span className="text-emerald-400 font-bold">+{Math.floor((v.views || 0) * 0.15)} live</span>
                     </div>
                   </div>
@@ -1660,7 +1667,7 @@ export default function AdminPanel({
                           <span>•</span>
                           <span>{vid.duration || "Exclusive"}</span>
                           <span>•</span>
-                          <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" />{vid.views}</span>
+                          <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" />{vid.views || 0} views</span>
                           <span>•</span>
                           <span 
                             className={`inline-flex items-center gap-0.5 px-1 rounded text-[8px] font-bold ${
@@ -2569,7 +2576,7 @@ export default function AdminPanel({
                     <h5 className="text-xs font-bold text-white truncate leading-snug">{vid.title}</h5>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] px-1.5 py-0.5 bg-white/5 rounded border border-white/5 font-mono text-zinc-400 uppercase select-none">{vid.category}</span>
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold">👁️ {(vid.views || 0).toLocaleString()} Views</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">👁️ {(vid.views || 0).toLocaleString()} views</span>
                     </div>
                   </div>
                 </div>
@@ -2582,7 +2589,7 @@ export default function AdminPanel({
           <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-6">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Image className="w-5 h-5 text-emerald-400" />
+                <ImageIcon className="w-5 h-5 text-emerald-400" />
                 Banner Ads & Placement Manager
               </h3>
               <p className="text-xs text-slate-400 mt-1">Instantly inject, toggle, or swap banner HTML/Script scripts from the database</p>
@@ -3100,31 +3107,42 @@ export default function AdminPanel({
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   type="button"
+                  disabled={isUploadingImage}
                   onClick={() => {
                     setIsCropperOpen(false);
                     setImageToCrop(null);
                   }}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
+                  disabled={isUploadingImage}
                   onClick={async () => {
                     if (croppedAreaPixels && imageToCrop) {
                       try {
+                        setIsUploadingImage(true);
                         const croppedStr = await getCroppedImg(imageToCrop, croppedAreaPixels);
-                        setThumbnailUrl(croppedStr);
+                        const downloadUrl = await uploadThumbnail(croppedStr);
+                        setThumbnailUrl(downloadUrl);
                         setIsCropperOpen(false);
                         setImageToCrop(null);
+                        
+                        // Show success message
+                        setStatusMessage("Success: Thumbnail cropped and saved successfully!");
+                        setTimeout(() => setStatusMessage(null), 4000);
                       } catch (e: any) {
-                        alert("Cropping failed: " + e.message);
+                        console.error("Cropping or upload error details:", e);
+                        alert("Cropping or upload failed: " + (e.message || String(e)));
+                      } finally {
+                        setIsUploadingImage(false);
                       }
                     }
                   }}
-                  className="px-5 py-2 bg-[#f5c518] hover:bg-[#ffe042] text-black text-xs font-black rounded-xl transition duration-150 active:scale-95 cursor-pointer shadow-lg"
+                  className="px-5 py-2 bg-[#f5c518] hover:bg-[#ffe042] text-black text-xs font-black rounded-xl transition duration-150 active:scale-95 cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center min-w-[100px]"
                 >
-                  Crop & Save
+                  {isUploadingImage ? "Saving..." : "Crop & Save"}
                 </button>
               </div>
             </div>
