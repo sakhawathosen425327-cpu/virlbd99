@@ -312,8 +312,17 @@ function setLocalStorageData<T>(key: string, value: T) {
   }
 }
 
+// IN-MEMORY SESSION CACHING LAYER TO DEFLECT EXCESSIVE REMOTE QUOTA READS
+let cachedVideos: Video[] | null = null;
+let cachedCategories: Category[] | null = null;
+let cachedAdSettings: AdSettings | null = null;
+let cachedSiteSettings: SiteSettings | null = null;
+
 // Unified APIs feeding into both LocalStorage + Cloud Firestore (if configured)
 export async function getVideos(): Promise<Video[]> {
+  if (cachedVideos) {
+    return cachedVideos;
+  }
   const path = "videos";
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {
@@ -330,6 +339,7 @@ export async function getVideos(): Promise<Video[]> {
       });
       // Sync back to local storage for instant offline retrieval
       setLocalStorageData("cineflex_v2_videos", list);
+      cachedVideos = list;
       return list;
     } catch (e) {
       console.warn("Firestore fetch videos failed. Falling back to LocalStorage.", e);
@@ -342,6 +352,7 @@ export async function getVideos(): Promise<Video[]> {
     const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
     return (dateB as any) - (dateA as any);
   });
+  cachedVideos = localList;
   return localList;
 }
 
@@ -356,6 +367,7 @@ export async function addVideo(video: Video): Promise<void> {
   const current = await getVideos();
   const updated = [video, ...current.filter(v => v.id !== video.id)];
   setLocalStorageData("cineflex_v2_videos", updated);
+  cachedVideos = updated;
 
   // 2. Sync to cloud
   if (isFirebaseConfigured && db) {
@@ -376,6 +388,7 @@ export async function updateVideo(id: string, fields: Partial<Video>): Promise<v
   const current = await getVideos();
   const updated = current.map(v => v.id === id ? { ...v, ...fields } : v);
   setLocalStorageData("cineflex_v2_videos", updated);
+  cachedVideos = updated;
 
   // 2. Sync to cloud
   if (isFirebaseConfigured && db) {
@@ -394,6 +407,7 @@ export async function deleteVideo(id: string): Promise<void> {
   const current = await getVideos();
   const updated = current.filter(v => v.id !== id);
   setLocalStorageData("cineflex_v2_videos", updated);
+  cachedVideos = updated;
 
   // 2. Sync to cloud
   if (isFirebaseConfigured && db) {
@@ -406,6 +420,9 @@ export async function deleteVideo(id: string): Promise<void> {
 }
 
 export async function getCategories(): Promise<Category[]> {
+  if (cachedCategories) {
+    return cachedCategories;
+  }
   const path = "categories";
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {
@@ -416,6 +433,7 @@ export async function getCategories(): Promise<Category[]> {
       });
       if (list.length > 0) {
         setLocalStorageData("cineflex_v2_categories", list);
+        cachedCategories = list;
         return list;
       }
     } catch (e) {
@@ -423,7 +441,9 @@ export async function getCategories(): Promise<Category[]> {
       checkQuotaError(e);
     }
   }
-  return getLocalStorageData<Category[]>("cineflex_v2_categories", DEFAULT_CATEGORIES);
+  const localList = getLocalStorageData<Category[]>("cineflex_v2_categories", DEFAULT_CATEGORIES);
+  cachedCategories = localList;
+  return localList;
 }
 
 export async function addCategory(category: Category): Promise<void> {
@@ -432,6 +452,7 @@ export async function addCategory(category: Category): Promise<void> {
   const current = await getCategories();
   const updated = [...current.filter(c => c.id !== category.id), category];
   setLocalStorageData("cineflex_v2_categories", updated);
+  cachedCategories = updated;
 
   // 2. Sync to cloud
   if (isFirebaseConfigured && db) {
@@ -444,6 +465,9 @@ export async function addCategory(category: Category): Promise<void> {
 }
 
 export async function getAdSettings(): Promise<AdSettings> {
+  if (cachedAdSettings) {
+    return cachedAdSettings;
+  }
   const adDocRef = doc(db, "adSettings", "global");
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {
@@ -451,6 +475,7 @@ export async function getAdSettings(): Promise<AdSettings> {
       if (snap.exists()) {
         const found = snap.data() as AdSettings;
         setLocalStorageData("cineflex_v2_ad_settings", found);
+        cachedAdSettings = found;
         return found;
       } else {
         // Bi-directional safety sync: Check if we have settings in LocalStorage first
@@ -458,11 +483,13 @@ export async function getAdSettings(): Promise<AdSettings> {
         if (localData && localData.id === "global") {
           // Upload local data to Firestore so we don't lose it!
           await setDoc(adDocRef, localData);
+          cachedAdSettings = localData;
           return localData;
         } else {
           // If completely empty in both, seed the initial default safely
           await setDoc(adDocRef, DEFAULT_AD_SETTINGS);
           setLocalStorageData("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+          cachedAdSettings = DEFAULT_AD_SETTINGS;
           return DEFAULT_AD_SETTINGS;
         }
       }
@@ -471,11 +498,14 @@ export async function getAdSettings(): Promise<AdSettings> {
       checkQuotaError(e);
     }
   }
-  return getLocalStorageData<AdSettings>("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+  const localSettings = getLocalStorageData<AdSettings>("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+  cachedAdSettings = localSettings;
+  return localSettings;
 }
 
 export async function updateAdSettings(settings: AdSettings): Promise<void> {
   const path = "adSettings/global";
+  cachedAdSettings = settings;
   // 1. Write locally
   setLocalStorageData("cineflex_v2_ad_settings", settings);
 
@@ -485,6 +515,38 @@ export async function updateAdSettings(settings: AdSettings): Promise<void> {
       await setDoc(doc(db, "adSettings", "global"), settings);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  }
+}
+
+export async function updateAdStats(clicks: number, impressions: number, earnings: number, cpm: number): Promise<void> {
+  const path = "adSettings/global";
+  if (cachedAdSettings) {
+    cachedAdSettings.clicks = clicks;
+    cachedAdSettings.impressions = impressions;
+    cachedAdSettings.earnings = earnings;
+    cachedAdSettings.cpm = cpm;
+    setLocalStorageData("cineflex_v2_ad_settings", cachedAdSettings);
+  } else {
+    const local = getLocalStorageData<AdSettings>("cineflex_v2_ad_settings", DEFAULT_AD_SETTINGS);
+    local.clicks = clicks;
+    local.impressions = impressions;
+    local.earnings = earnings;
+    local.cpm = cpm;
+    setLocalStorageData("cineflex_v2_ad_settings", local);
+    cachedAdSettings = local;
+  }
+
+  if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
+    try {
+      await updateDoc(doc(db, "adSettings", "global"), {
+        clicks,
+        impressions,
+        earnings,
+        cpm
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
     }
   }
 }
@@ -1458,6 +1520,9 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
+  if (cachedSiteSettings) {
+    return cachedSiteSettings;
+  }
   const collectionName = "siteConfigs";
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {
@@ -1466,10 +1531,12 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       if (snap.exists()) {
         const data = snap.data() as SiteSettings;
         localStorage.setItem("vbd99_local_site_settings", JSON.stringify(data));
+        cachedSiteSettings = data;
         return data;
       } else {
         await setDoc(docRef, DEFAULT_SITE_SETTINGS);
         localStorage.setItem("vbd99_local_site_settings", JSON.stringify(DEFAULT_SITE_SETTINGS));
+        cachedSiteSettings = DEFAULT_SITE_SETTINGS;
         return DEFAULT_SITE_SETTINGS;
       }
     } catch (err) {
@@ -1479,13 +1546,19 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   }
   const localStr = localStorage.getItem("vbd99_local_site_settings");
   if (localStr) {
-    try { return JSON.parse(localStr); } catch {}
+    try {
+      const parsed = JSON.parse(localStr);
+      cachedSiteSettings = parsed;
+      return parsed;
+    } catch {}
   }
+  cachedSiteSettings = DEFAULT_SITE_SETTINGS;
   return DEFAULT_SITE_SETTINGS;
 }
 
 export async function updateSiteSettings(settings: SiteSettings): Promise<void> {
   const collectionName = "siteConfigs";
+  cachedSiteSettings = settings;
   localStorage.setItem("vbd99_local_site_settings", JSON.stringify(settings));
   if (isFirebaseConfigured && db && !isFirestoreQuotaOrConnectionFailed) {
     try {

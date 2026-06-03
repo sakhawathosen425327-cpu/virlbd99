@@ -15,6 +15,7 @@ import {
   deleteVideo, 
   addCategory,
   updateAdSettings, 
+  updateAdStats,
   testConnection, 
   resetToSeedData,
   getAdminSecurity,
@@ -623,7 +624,7 @@ export default function App() {
       return match[1];
     }
     const params = new URLSearchParams(window.location.search);
-    return params.get("video");
+    return params.get("video") || params.get("v");
   };
 
   // 1. Auto-open video from shared URL on initial load of videos
@@ -717,9 +718,10 @@ export default function App() {
         impressions: updatedImpressions,
         cpm: liveCpm,
         earnings: Number(updatedEarnings)
+
       };
 
-      await updateAdSettings(nextSettings);
+      await updateAdStats(updatedClicks, updatedImpressions, Number(updatedEarnings), liveCpm);
       setAdSettings(nextSettings);
     } catch (e) {
       console.warn("Analytics increment failed:", e);
@@ -735,7 +737,7 @@ export default function App() {
         earnings: 0,
         cpm: 4.56
       };
-      await updateAdSettings(nextSettings);
+      await updateAdStats(0, 0, 0, 4.56);
       setAdSettings(nextSettings);
     } catch (e) {
       console.warn("Analytics reset failed:", e);
