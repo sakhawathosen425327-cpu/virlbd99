@@ -48,6 +48,8 @@ export function convertToEmbed(url: string): EmbedResult {
     let id = "";
     if (trimmed.includes("watch?v=")) {
       id = trimmed.split("watch?v=")[1].split("&")[0];
+    } else if (trimmed.includes("/shorts/")) {
+      id = trimmed.split("/shorts/")[1].split("?")[0].split("&")[0];
     } else if (trimmed.includes("youtu.be/")) {
       id = trimmed.split("youtu.be/")[1].split("?")[0];
     } else if (trimmed.includes("/embed/")) {
